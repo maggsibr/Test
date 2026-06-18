@@ -256,10 +256,10 @@
 
   <div class="title">
     <h1>Solar System</h1>
-    <p>Tap a planet &middot; Drag to rotate the view</p>
+    <p>Tap the Sun or a planet &middot; Drag to rotate the view</p>
   </div>
 
-  <div class="hint" id="hint">Drag to rotate &nbsp;&bull;&nbsp; Tap a planet for facts</div>
+  <div class="hint" id="hint">Drag to rotate &nbsp;&bull;&nbsp; Tap the Sun or a planet for facts</div>
 
   <div class="controls">
     <button class="btn" id="playBtn" title="Pause / Play" aria-label="Pause or play">⏸</button>
@@ -344,6 +344,13 @@
     p.screen = { x: 0, y: 0, r: 0, depth: 0 };
   });
 
+  // The Sun is selectable too (shares the planet card's data shape).
+  const SUN = {
+    name: "Sun", colors: ["#fff6d8", "#ff9b21"],
+    desc: "The star at the heart of the solar system — a vast ball of hot plasma whose gravity holds every planet in orbit. It makes up about 99.86% of all the mass here.",
+    facts: { "Diameter": "1,391,000 km", "Type": "G-type star", "Surface": "~5,500°C", "Core": "~15M °C", "Age": "4.6B yrs", "Mass": "333,000 Earths" }
+  };
+
   // ---------- View / interaction state ----------
   let W = 0, H = 0, DPR = 1;
   let tiltX = 1.05;          // pitch (radians) — how flat the orbits look
@@ -353,6 +360,7 @@
   let paused = false;
   let speedMul = 1;
   let selected = null;
+  let sunR = 30;             // sun's current screen radius (for tap hit-testing)
   let lastT = performance.now();
 
   // ---------- Stars ----------
@@ -442,6 +450,7 @@
     const pulse = 1 + 0.03 * Math.sin(t * 0.002);
     const R = 20 * pulse * (viewScale / 70 + 0.6);
     const r = Math.max(16, R);
+    sunR = r;
     // outer glow
     const g = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, r * 4.2);
     g.addColorStop(0, "rgba(255, 226, 150, 0.9)");
@@ -461,6 +470,15 @@
     ctx.beginPath();
     ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
     ctx.fill();
+
+    // selection highlight
+    if (selected === SUN) {
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, r + 8, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255,255,255,0.9)";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
   }
 
   function planetScreenRadius(p) {
@@ -623,9 +641,15 @@
     }
     if (best) {
       selectPlanet(best);
-    } else {
-      deselect();
+      return;
     }
+    // otherwise, did they tap the Sun?
+    const sdx = centerX - x, sdy = centerY - y;
+    if (Math.sqrt(sdx * sdx + sdy * sdy) < Math.max(sunR + 16, 30)) {
+      selectPlanet(SUN);
+      return;
+    }
+    deselect();
   }
 
   // ---------- Info card ----------
