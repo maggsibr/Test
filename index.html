@@ -30,12 +30,14 @@
   #hud {
     position: absolute; top: 0; left: 0; right: 0;
     padding: 14px 18px;
-    display: flex; align-items: center; justify-content: space-between;
+    display: flex; align-items: flex-start; justify-content: space-between;
     pointer-events: none;
     color: #fff;
     text-shadow: 0 2px 6px rgba(0,0,0,.5);
     z-index: 5;
+    opacity: 0; transition: opacity .3s;
   }
+  #hud.show { opacity: 1; }
   .hud-card {
     background: rgba(0,0,0,.32);
     backdrop-filter: blur(6px);
@@ -43,6 +45,7 @@
     border-radius: 14px;
     padding: 8px 14px;
     line-height: 1.15;
+    min-width: 86px;
   }
   .hud-card .big { font-size: 22px; font-weight: 700; }
   .hud-card .small { font-size: 12px; opacity: .85; letter-spacing: .3px; text-transform: uppercase; }
@@ -59,7 +62,7 @@
 
   /* Banner / message */
   #message {
-    position: absolute; left: 50%; top: 50%;
+    position: absolute; left: 50%; top: 46%;
     transform: translate(-50%,-50%) scale(.8);
     opacity: 0;
     pointer-events: none;
@@ -74,38 +77,108 @@
   #message.save { color: #fbbf24; }
   #message.miss { color: #f87171; }
 
+  /* Points popup */
+  #pointsPopup {
+    position: absolute; left: 50%; top: 58%;
+    transform: translate(-50%, 0);
+    font-size: clamp(20px, 5vw, 30px); font-weight: 800;
+    color: var(--accent);
+    opacity: 0; pointer-events: none; z-index: 6;
+    text-shadow: 0 2px 10px rgba(0,0,0,.7); white-space: nowrap;
+  }
+  #pointsPopup.show { animation: ptsPop 1.25s ease-out forwards; }
+  @keyframes ptsPop {
+    0%   { opacity: 0; transform: translate(-50%, 16px) scale(.7); }
+    18%  { opacity: 1; transform: translate(-50%, -2px) scale(1); }
+    78%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -56px) scale(1); }
+  }
+
   /* Hint */
   #hint {
     position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
     color: #fff; font-size: 15px; background: rgba(0,0,0,.32);
     padding: 8px 16px; border-radius: 999px; z-index: 5;
     text-shadow: 0 1px 3px rgba(0,0,0,.5);
-    transition: opacity .3s;
+    transition: opacity .3s; pointer-events: none; text-align: center;
   }
 
-  /* Overlay (winner / play again) */
-  #overlay {
-    position: absolute; inset: 0; z-index: 10;
-    background: rgba(4,12,8,.78);
-    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  /* Full-screen overlays (start + end) */
+  .screen {
+    position: absolute; inset: 0; z-index: 12;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    text-align: center; color: #fff;
-    opacity: 0; pointer-events: none;
-    transition: opacity .4s;
+    text-align: center; color: #fff; padding: 24px;
+    background: radial-gradient(125% 90% at 50% 10%, rgba(24,46,78,.55), rgba(4,12,8,.88));
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    opacity: 0; pointer-events: none; transition: opacity .4s;
   }
-  #overlay.show { opacity: 1; pointer-events: auto; }
-  #overlay h1 { font-size: clamp(40px, 9vw, 84px); margin: 0 0 6px; }
-  #overlay .sub { font-size: clamp(18px,4vw,26px); opacity: .9; margin-bottom: 8px; }
-  #overlay .finalScore { font-size: clamp(28px,6vw,40px); font-weight: 800; margin: 8px 0 28px; letter-spacing: 2px; }
-  #playAgain {
-    font-size: 22px; font-weight: 700; color: #062;
-    background: var(--accent);
-    border: none; border-radius: 999px;
-    padding: 16px 40px; cursor: pointer;
-    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  .screen.show { opacity: 1; pointer-events: auto; }
+
+  /* Start screen */
+  #startScreen .kicker {
+    font-size: clamp(15px, 4vw, 22px); letter-spacing: .5em; font-weight: 700;
+    color: var(--accent); margin-bottom: -4px; padding-left: .5em;
+  }
+  #startScreen h1 {
+    font-size: clamp(46px, 12vw, 92px); margin: 0 0 4px; letter-spacing: 2px;
+    font-weight: 900; text-shadow: 0 6px 22px rgba(0,0,0,.5);
+  }
+  .modeSelect {
+    display: flex; gap: 8px; margin: 20px 0 10px; flex-wrap: wrap; justify-content: center;
+  }
+  .modeBtn {
+    font-family: inherit; font-size: 16px; font-weight: 700; color: #fff;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
+    border-radius: 999px; padding: 10px 22px; cursor: pointer; transition: all .15s;
+  }
+  .modeBtn.active { background: var(--accent); color: #053; border-color: var(--accent); }
+  .modeDesc {
+    max-width: 440px; font-size: 15px; line-height: 1.5; opacity: .85;
+    min-height: 68px; margin: 4px 0;
+  }
+  .hiRow { font-size: 15px; opacity: .9; margin-bottom: 24px; }
+  .hiRow span { color: var(--accent); font-weight: 800; }
+  #startBtn {
+    font-family: inherit; font-size: 24px; font-weight: 800; color: #053;
+    background: var(--accent); border: none; border-radius: 999px;
+    padding: 16px 56px; cursor: pointer; box-shadow: 0 10px 28px rgba(0,0,0,.4);
     transition: transform .12s;
   }
-  #playAgain:active { transform: scale(.95); }
+  #startBtn:active { transform: scale(.95); }
+
+  /* End overlay */
+  #overlay h1 { font-size: clamp(40px, 9vw, 84px); margin: 0 0 6px; }
+  #overlay .sub { font-size: clamp(18px,4vw,26px); opacity: .9; margin-bottom: 8px; }
+  #overlay .finalScore { font-size: clamp(28px,6vw,40px); font-weight: 800; margin: 8px 0 8px; letter-spacing: 2px; }
+  #newBest {
+    color: var(--accent); font-weight: 800; font-size: clamp(16px,4vw,22px);
+    margin: 2px 0 18px; opacity: 0; transition: opacity .3s;
+  }
+  #newBest.show { opacity: 1; }
+  .overlayBtns { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  #playAgain {
+    font-family: inherit; font-size: 22px; font-weight: 700; color: #053;
+    background: var(--accent); border: none; border-radius: 999px;
+    padding: 15px 38px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    transition: transform .12s;
+  }
+  #menuBtn {
+    font-family: inherit; font-size: 22px; font-weight: 700; color: #fff;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22);
+    border-radius: 999px; padding: 15px 34px; cursor: pointer; transition: transform .12s;
+  }
+  #playAgain:active, #menuBtn:active { transform: scale(.95); }
+
+  /* Mute toggle */
+  #muteBtn {
+    position: absolute; bottom: 18px; right: 18px; z-index: 14;
+    width: 48px; height: 48px; border-radius: 50%;
+    border: 1px solid rgba(255,255,255,.25); background: rgba(0,0,0,.42);
+    color: #fff; font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  }
+  #muteBtn:active { transform: scale(.92); }
 </style>
 </head>
 <body>
@@ -113,31 +186,53 @@
   <canvas id="canvas"></canvas>
 
   <div id="hud">
-    <div class="hud-card">
-      <div class="small">You</div>
-      <div class="big" id="scoreYou">0</div>
+    <div class="hud-card" id="cardLeft">
+      <div class="small" id="leftLabel">You</div>
+      <div class="big" id="leftVal">0</div>
       <div id="shotTrack"></div>
     </div>
-    <div class="hud-card" style="text-align:center">
-      <div class="small">Penalty</div>
-      <div class="big" id="shotNum">1 / 5</div>
+    <div class="hud-card" id="cardCenter" style="text-align:center">
+      <div class="small" id="centerLabel">Penalty</div>
+      <div class="big" id="centerVal">1 / 5</div>
     </div>
-    <div class="hud-card" style="text-align:right">
-      <div class="small">Keeper</div>
-      <div class="big" id="scoreKeeper">0</div>
-      <div class="small" style="margin-top:6px" id="resultTally">0 goals · 0 saved</div>
+    <div class="hud-card" id="cardRight" style="text-align:right">
+      <div class="small" id="rightLabel">Keeper</div>
+      <div class="big" id="rightVal">0</div>
+      <div class="small" id="rightSub" style="margin-top:6px">Best 0/5</div>
     </div>
   </div>
 
   <div id="message"></div>
+  <div id="pointsPopup"></div>
   <div id="hint">Drag from the ball to aim &amp; set power — release to shoot</div>
 
-  <div id="overlay">
+  <!-- Start screen -->
+  <div id="startScreen" class="screen">
+    <div class="kicker">⚽ PENALTY</div>
+    <h1>SHOOTOUT</h1>
+    <div class="modeSelect" id="modeSelect">
+      <button class="modeBtn active" data-mode="classic">Classic</button>
+      <button class="modeBtn" data-mode="competition">Competition</button>
+      <button class="modeBtn" data-mode="survival">Survival</button>
+    </div>
+    <div class="modeDesc" id="modeDesc"></div>
+    <div class="hiRow">Best: <span id="startHigh">—</span></div>
+    <button id="startBtn">Start</button>
+  </div>
+
+  <!-- End overlay -->
+  <div id="overlay" class="screen">
     <h1 id="winTitle">You Win!</h1>
     <div class="sub" id="winSub">Great shooting</div>
     <div class="finalScore" id="finalScore">3 – 1</div>
-    <button id="playAgain">Play again</button>
+    <div id="newBest">★ New best!</div>
+    <div class="overlayBtns">
+      <button id="playAgain">Play again</button>
+      <button id="menuBtn">Main menu</button>
+    </div>
   </div>
+
+  <button id="muteBtn" aria-label="Toggle sound">🔊</button>
 </div>
 
 <script>
@@ -147,9 +242,104 @@
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
 
+  // ---- Game modes ----
+  const MODES = {
+    classic: {
+      label: "Classic", shots: 5,
+      desc: "Best of five penalties. Beat the keeper and outscore the gloves to win the shootout."
+    },
+    competition: {
+      label: "Competition", shots: 8,
+      desc: "Eight shots, points for placement. Pick out the corners and top bins to rack up the highest total."
+    },
+    survival: {
+      label: "Survival", shots: Infinity,
+      desc: "Keep scoring to build your streak. One save or miss and the run is over — how long can you last?"
+    },
+  };
+
+  // ---- Persistent high scores ----
+  const HKEY = "pen_high_v1";
+  let high = loadHigh();
+  function loadHigh() {
+    try { return JSON.parse(localStorage.getItem(HKEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveHigh() {
+    try { localStorage.setItem(HKEY, JSON.stringify(high)); } catch (e) {}
+  }
+
+  // ---- Sound (Web Audio API, no external files) ----
+  const Sound = (() => {
+    let actx = null;
+    let muted = localStorage.getItem("pen_muted") === "1";
+    function ensure() {
+      if (!actx) {
+        try { actx = new (window.AudioContext || window.webkitAudioContext)(); }
+        catch (e) { actx = null; }
+      }
+      if (actx && actx.state === "suspended") actx.resume();
+    }
+    function env(g, t, a, d, peak) {
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak, t + a);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+    }
+    function note(freq, start, dur, type = "sine", peak = 0.25, slideTo = null) {
+      if (!actx) return;
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, start);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, start + dur);
+      env(g, start, 0.006, dur, peak);
+      o.connect(g).connect(actx.destination);
+      o.start(start); o.stop(start + dur + 0.05);
+    }
+    function noise(start, dur, peak = 0.3, filterFreq = 1000, type = "lowpass") {
+      if (!actx) return;
+      const n = Math.floor(actx.sampleRate * dur);
+      const buf = actx.createBuffer(1, n, actx.sampleRate);
+      const data = buf.getChannelData(0);
+      for (let i = 0; i < n; i++) data[i] = Math.random() * 2 - 1;
+      const src = actx.createBufferSource(); src.buffer = buf;
+      const f = actx.createBiquadFilter(); f.type = type; f.frequency.value = filterFreq;
+      const g = actx.createGain(); env(g, start, 0.006, dur, peak);
+      src.connect(f).connect(g).connect(actx.destination);
+      src.start(start); src.stop(start + dur + 0.02);
+    }
+    function kick() {
+      ensure(); if (muted || !actx) return;
+      const t = actx.currentTime;
+      note(170, t, 0.12, "sine", 0.45, 60);   // boot thump with pitch drop
+      noise(t, 0.05, 0.28, 2200, "lowpass");   // contact snap
+    }
+    function goal() {
+      ensure(); if (muted || !actx) return;
+      const t = actx.currentTime;
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) =>
+        note(f, t + i * 0.09, 0.26, "triangle", 0.3));
+      noise(t, 0.55, 0.10, 2800, "highpass");  // crowd swell
+    }
+    function save() {
+      ensure(); if (muted || !actx) return;
+      const t = actx.currentTime;
+      note(230, t, 0.18, "square", 0.3, 110);  // gloves thunk
+      noise(t, 0.09, 0.3, 700, "lowpass");
+    }
+    function miss() {
+      ensure(); if (muted || !actx) return;
+      const t = actx.currentTime;
+      note(440, t, 0.4, "sawtooth", 0.16, 120); // descending whoosh
+      noise(t, 0.3, 0.07, 1400, "bandpass");
+    }
+    return {
+      ensure, kick, goal, save, miss,
+      toggleMute() { muted = !muted; localStorage.setItem("pen_muted", muted ? "1" : "0"); return muted; },
+      isMuted() { return muted; },
+    };
+  })();
+
   // ---- Layout / sizing ----
   let W = 0, H = 0, DPR = 1;
-  // Field reference geometry (computed on resize)
   const field = {};
 
   function resize() {
@@ -165,22 +355,18 @@
   }
 
   function computeField() {
-    // Goal sits in upper-middle of screen. Ball near bottom center.
     const goalW = Math.min(W * 0.62, 560);
     const goalH = goalW * 0.42;
     const goalX = (W - goalW) / 2;
-    // Horizon line where ground meets backdrop
     field.horizonY = H * 0.30;
     field.goalX = goalX;
     field.goalY = field.horizonY + H * 0.04;
     field.goalW = goalW;
     field.goalH = goalH;
-    field.postT = Math.max(6, goalW * 0.016); // post thickness
-    // Ball start
+    field.postT = Math.max(6, goalW * 0.016);
     field.ballStartX = W / 2;
     field.ballStartY = H * 0.86;
     field.ballR = Math.max(16, Math.min(W, H) * 0.032);
-    // Goal mouth (inside of posts) for scoring
     field.mouthX = goalX + field.postT;
     field.mouthW = goalW - field.postT * 2;
     field.mouthY = field.goalY + field.postT;
@@ -188,42 +374,21 @@
   }
 
   // ---- Game state ----
-  const TOTAL_SHOTS = 5;
-  let state = "aiming"; // aiming | shooting | resolving | over
-  let shotIndex = 0;    // 0-based current penalty
-  let youScore = 0, keeperScore = 0;
+  let mode = "classic";       // active play mode
+  let selectedMode = "classic"; // chosen on start screen
+  let state = "menu";         // menu | aiming | shooting | resolving | over
+  let shotIndex = 0;
+  let youScore = 0, keeperScore = 0;   // classic
   let goals = 0, savedOrMissed = 0;
-  const results = []; // 'goal' | 'miss'
+  let totalPoints = 0;                  // competition / survival
+  let streak = 0;                       // survival
+  const results = [];                   // 'goal' | 'miss' (classic pips)
 
-  // Ball
-  const ball = {
-    x: 0, y: 0, r: 0,
-    scale: 1,           // visual scale = perceived distance (1 near, smaller far)
-    spin: 0,
-    flying: false,
-  };
+  const ball = { x: 0, y: 0, r: 0, scale: 1, spin: 0, flying: false };
+  const keeper = { dive: 0, targetDive: 0, jump: 0, targetJump: 0, chosen: false, guess: 0, decisionTime: 0 };
 
-  // Keeper
-  const keeper = {
-    // position relative to goal mouth, x in 0..1 across mouth, baseline standing
-    dive: 0,            // current horizontal offset factor -1..1
-    targetDive: 0,
-    jump: 0,            // vertical jump 0..1
-    targetJump: 0,
-    chosen: false,
-    decisionTime: 0,
-  };
-
-  // Aim
-  let aiming = false;
-  let aimStart = null;   // {x,y}
-  let aimCur = null;     // {x,y}
-
-  // Net wobble
-  let netWobble = 0;     // amplitude
-  let netWobbleT = 0;
-
-  // Shot animation params
+  let aiming = false, aimStart = null, aimCur = null;
+  let netWobble = 0, netWobbleT = 0;
   let shot = null;
 
   function resetBall() {
@@ -235,39 +400,88 @@
     ball.flying = false;
   }
 
+  function resetKeeper() {
+    keeper.dive = keeper.targetDive = 0;
+    keeper.jump = keeper.targetJump = 0;
+    keeper.chosen = false;
+    keeper.guess = 0;
+  }
+
+  // ---- Element refs ----
+  const hudEl = document.getElementById("hud");
+  const leftLabel = document.getElementById("leftLabel");
+  const leftVal = document.getElementById("leftVal");
+  const centerLabel = document.getElementById("centerLabel");
+  const centerVal = document.getElementById("centerVal");
+  const rightLabel = document.getElementById("rightLabel");
+  const rightVal = document.getElementById("rightVal");
+  const rightSub = document.getElementById("rightSub");
+  const trackEl = document.getElementById("shotTrack");
+  const messageEl = document.getElementById("message");
+  const pointsPopupEl = document.getElementById("pointsPopup");
+  const overlay = document.getElementById("overlay");
+  const hintEl = document.getElementById("hint");
+  const startScreen = document.getElementById("startScreen");
+  const startHighEl = document.getElementById("startHigh");
+  const modeDescEl = document.getElementById("modeDesc");
+  const newBestEl = document.getElementById("newBest");
+  const muteBtn = document.getElementById("muteBtn");
+
+  // ---- Menu / flow ----
+  function highText(m) {
+    const v = high[m] || 0;
+    if (m === "classic") return v + " / 5 goals";
+    if (m === "competition") return v + " pts";
+    return v + " in a row";
+  }
+
+  function refreshStartScreen() {
+    modeDescEl.textContent = MODES[selectedMode].desc;
+    startHighEl.textContent = highText(selectedMode);
+  }
+
+  function showMenu() {
+    state = "menu";
+    overlay.classList.remove("show");
+    newBestEl.classList.remove("show");
+    hudEl.classList.remove("show");
+    startScreen.classList.add("show");
+    showHint(false);
+    resetKeeper();
+    resetBall();
+    shot = null;
+    refreshStartScreen();
+  }
+
+  function startGame(m) {
+    mode = m;
+    Sound.ensure();
+    startScreen.classList.remove("show");
+    newGame();
+  }
+
   function newGame() {
     shotIndex = 0;
     youScore = keeperScore = 0;
     goals = savedOrMissed = 0;
+    totalPoints = 0; streak = 0;
     results.length = 0;
     state = "aiming";
-    keeper.dive = keeper.targetDive = 0;
-    keeper.jump = keeper.targetJump = 0;
-    keeper.chosen = false;
+    resetKeeper();
     resetBall();
-    updateHUD();
+    shot = null;
     overlay.classList.remove("show");
+    newBestEl.classList.remove("show");
+    hudEl.classList.add("show");
+    updateHUD();
     showHint(true);
+    setTimeout(() => { if (state === "aiming" && shotIndex === 0) showHint(false); }, 3200);
   }
 
   // ---- HUD ----
-  const scoreYouEl = document.getElementById("scoreYou");
-  const scoreKeeperEl = document.getElementById("scoreKeeper");
-  const shotNumEl = document.getElementById("shotNum");
-  const tallyEl = document.getElementById("resultTally");
-  const trackEl = document.getElementById("shotTrack");
-  const messageEl = document.getElementById("message");
-  const overlay = document.getElementById("overlay");
-  const hintEl = document.getElementById("hint");
-
-  function updateHUD() {
-    scoreYouEl.textContent = youScore;
-    scoreKeeperEl.textContent = keeperScore;
-    shotNumEl.textContent = Math.min(shotIndex + 1, TOTAL_SHOTS) + " / " + TOTAL_SHOTS;
-    tallyEl.textContent = goals + (goals === 1 ? " goal · " : " goals · ") + savedOrMissed + " stopped";
-    // pips
+  function renderPips() {
     trackEl.innerHTML = "";
-    for (let i = 0; i < TOTAL_SHOTS; i++) {
+    for (let i = 0; i < MODES.classic.shots; i++) {
       const p = document.createElement("div");
       p.className = "pip";
       if (results[i] === "goal") p.classList.add("goal");
@@ -276,15 +490,46 @@
     }
   }
 
-  function showHint(show) {
-    hintEl.style.opacity = show ? "1" : "0";
+  function updateHUD() {
+    const shots = MODES[mode].shots;
+    if (mode === "classic") {
+      leftLabel.textContent = "You"; leftVal.textContent = youScore;
+      trackEl.style.display = "flex"; renderPips();
+      centerLabel.textContent = "Penalty";
+      centerVal.textContent = Math.min(shotIndex + 1, shots) + " / " + shots;
+      rightLabel.textContent = "Keeper"; rightVal.textContent = keeperScore;
+      rightSub.textContent = "Best " + (high.classic || 0) + "/5";
+    } else if (mode === "competition") {
+      leftLabel.textContent = "Points"; leftVal.textContent = totalPoints;
+      trackEl.style.display = "none";
+      centerLabel.textContent = "Shot";
+      centerVal.textContent = Math.min(shotIndex + 1, shots) + " / " + shots;
+      rightLabel.textContent = "Best"; rightVal.textContent = (high.competition || 0);
+      rightSub.textContent = goals + " scored";
+    } else { // survival
+      leftLabel.textContent = "Points"; leftVal.textContent = totalPoints;
+      trackEl.style.display = "none";
+      centerLabel.textContent = "Streak"; centerVal.textContent = streak;
+      rightLabel.textContent = "Best"; rightVal.textContent = (high.survival || 0);
+      rightSub.textContent = "in a row";
+    }
   }
+
+  function showHint(show) { hintEl.style.opacity = show ? "1" : "0"; }
 
   function flashMessage(text, type) {
     messageEl.textContent = text;
     messageEl.className = "";
     messageEl.classList.add(type, "show");
     setTimeout(() => messageEl.classList.remove("show"), 1100);
+  }
+
+  function showPoints(text, color) {
+    pointsPopupEl.textContent = text;
+    pointsPopupEl.style.color = color || "var(--accent)";
+    pointsPopupEl.classList.remove("show");
+    void pointsPopupEl.offsetWidth; // restart animation
+    pointsPopupEl.classList.add("show");
   }
 
   // ---- Input ----
@@ -296,10 +541,10 @@
   function onDown(e) {
     if (state !== "aiming") return;
     const p = pointFromEvent(e);
-    // Must start near the ball
     const d = Math.hypot(p.x - ball.x, p.y - ball.y);
     if (d > ball.r * 3.2) return;
     e.preventDefault();
+    Sound.ensure();
     aiming = true;
     aimStart = { x: ball.x, y: ball.y };
     aimCur = p;
@@ -320,7 +565,6 @@
     const dy = aimCur.y - aimStart.y;
     const dragLen = Math.hypot(dx, dy);
     if (dragLen < ball.r * 0.6 || dy > -8) {
-      // too small or dragged downward — cancel
       aimStart = aimCur = null;
       return;
     }
@@ -337,77 +581,68 @@
   // ---- Shooting ----
   function launchShot(dx, dy, dragLen) {
     state = "shooting";
-
-    // Aim direction. Horizontal aim mapped to goal target x.
-    // Use drag angle to set landing x within (and slightly beyond) the goal.
     const maxDrag = Math.min(W, H) * 0.42;
-    const power = Math.min(dragLen / maxDrag, 1); // 0..1
+    const power = Math.min(dragLen / maxDrag, 1);
+    const targetXFactor = (dx / (maxDrag * 0.7));
+    const targetYFactor = Math.min(Math.abs(dy) / (maxDrag * 0.85), 1.15);
 
-    // Horizontal target: drag right aims right, drag left aims left.
-    // Allow overshoot so you can miss wide.
-    const targetXFactor = (dx / (maxDrag * 0.7)); // -1..1 (can exceed)
-    // Vertical: more vertical drag + power -> higher / further. Map to target height.
-    const targetYFactor = Math.min(Math.abs(dy) / (maxDrag * 0.85), 1.15); // 0..~1.15
-
-    // Compute landing point in screen space at the goal plane.
     const mouthCx = field.mouthX + field.mouthW / 2;
     const landX = mouthCx + targetXFactor * (field.mouthW * 0.62);
-    // Height: low shots near goal line, high shots near crossbar (can go over)
     const goalLineY = field.mouthY + field.mouthH;
     const landY = goalLineY - targetYFactor * (field.mouthH * 1.02);
 
-    // Flight time based on power (more power = faster)
-    const duration = 720 - power * 300; // ms
+    const duration = 720 - power * 300;
 
     shot = {
-      t0: performance.now(),
-      duration,
-      fromX: ball.x, fromY: ball.y,
-      landX, landY,
-      power,
-      targetXFactor,
-      // apex height for arc
+      t0: performance.now(), duration,
+      fromX: ball.x, fromY: ball.y, landX, landY, power, targetXFactor,
       arc: Math.min(0.5 + targetYFactor * 0.5, 1) * (H * 0.10) * (0.6 + power * 0.7),
       spinDir: Math.sign(dx) || 1,
-      resolved: false,
-      saved: false,
-      scored: false,
-      onTarget: false,
+      resolved: false, saved: false, scored: false, onTarget: false,
     };
 
     ball.flying = true;
-
-    // Keeper decides where to dive (with a slight reaction delay so it commits).
+    Sound.kick();
     decideKeeper(targetXFactor);
   }
 
   function decideKeeper(playerTargetXFactor) {
-    // Keeper guesses a side. Make beatable but not trivial.
-    // 38% left, 38% right, 24% center-ish. Plus a small chance it "reads" the shot.
     const r = Math.random();
-    let guess; // -1 left, 0 center, 1 right
+    let guess;
     if (r < 0.38) guess = -1;
     else if (r < 0.76) guess = 1;
     else guess = 0;
-
-    // ~22% chance the keeper reads your direction and guesses correctly.
     if (Math.random() < 0.22) {
       guess = playerTargetXFactor < -0.18 ? -1 : playerTargetXFactor > 0.18 ? 1 : 0;
     }
-
     keeper.guess = guess;
     keeper.targetDive = guess * 0.92;
-    // Keeper jumps a bit for side dives, less for center
     keeper.targetJump = guess === 0 ? 0.12 : 0.85;
     keeper.chosen = true;
-    keeper.decisionTime = performance.now() + 60; // commit almost immediately
+    keeper.decisionTime = performance.now() + 60;
+  }
+
+  // Points for a scored shot, based on placement.
+  function shotPoints(landX, landY) {
+    const relX = Math.max(0, Math.min(1, (landX - field.mouthX) / field.mouthW));
+    const goalLineY = field.mouthY + field.mouthH;
+    const h = (goalLineY - landY) / field.mouthH; // 0 low .. 1 top
+    const sideDist = Math.min(relX, 1 - relX);    // 0 at posts .. .5 center
+    const isSide = sideDist < 0.22;
+    const isTop = h > 0.62;
+    const isLow = h < 0.18;
+    if (isSide && isTop) return { pts: 100, label: "Top corner!" };
+    if (isSide && isLow) return { pts: 80, label: "Bottom corner!" };
+    if (isSide)          return { pts: 60, label: "Side netting!" };
+    if (isTop)           return { pts: 50, label: "Roof of the net!" };
+    if (h > 0.35)        return { pts: 30, label: "Tidy finish" };
+    return { pts: 15, label: "Down the middle" };
   }
 
   function resolveShot() {
     if (shot.resolved) return;
     shot.resolved = true;
 
-    // Was it on target (inside goal mouth)?
     const insideX = shot.landX > field.mouthX + ball.r * 0.3 && shot.landX < field.mouthX + field.mouthW - ball.r * 0.3;
     const insideY = shot.landY > field.mouthY - ball.r * 0.2 && shot.landY < field.mouthY + field.mouthH + ball.r * 0.2;
     const onTarget = insideX && insideY;
@@ -415,96 +650,126 @@
 
     let saved = false;
     if (onTarget) {
-      // Keeper covers a region around its hands. Compute keeper hand x at goal plane.
       const mouthCx = field.mouthX + field.mouthW / 2;
       const keeperX = mouthCx + keeper.dive * (field.mouthW * 0.42);
-      const keeperReachX = field.mouthW * 0.20; // horizontal reach
-      // Keeper can reach low/mid; very high or very low corners are harder to save.
       const goalLineY = field.mouthY + field.mouthH;
-      const shotHeight = (goalLineY - shot.landY) / field.mouthH; // 0 low .. 1 top
-      let reachX = keeperReachX;
-      // Diving keepers reach further horizontally; standing keeper covers center well.
-      if (keeper.guess === 0) {
-        reachX = field.mouthW * 0.16;
-      }
+      const shotHeight = (goalLineY - shot.landY) / field.mouthH;
+      let reachX = field.mouthW * 0.20;
+      if (keeper.guess === 0) reachX = field.mouthW * 0.16;
       const dxToKeeper = Math.abs(shot.landX - keeperX);
-      // Vertical: keeper saves better in mid heights; top-corner & ground-corner harder.
       let vertCover = 1;
-      if (shotHeight > 0.72) vertCover = 0.45;       // top corner
-      else if (shotHeight < 0.12) vertCover = 0.7;   // along the ground
-      if (keeper.guess === 0 && shotHeight > 0.5) vertCover *= 0.6; // center keeper weak up high
-
-      if (dxToKeeper < reachX && Math.random() < vertCover) {
-        saved = true;
-      }
+      if (shotHeight > 0.72) vertCover = 0.45;
+      else if (shotHeight < 0.12) vertCover = 0.7;
+      if (keeper.guess === 0 && shotHeight > 0.5) vertCover *= 0.6;
+      if (dxToKeeper < reachX && Math.random() < vertCover) saved = true;
     }
 
-    if (onTarget && !saved) {
+    let outcome;
+    if (onTarget && !saved) outcome = "goal";
+    else if (onTarget && saved) outcome = "save";
+    else outcome = "miss";
+
+    if (outcome === "goal") {
+      const p = shotPoints(shot.landX, shot.landY);
+      let pts = p.pts, label = p.label;
+      // Bonus for beating a keeper who guessed your side.
+      if (keeper.guess !== 0 && Math.sign(keeper.guess) === Math.sign(shot.targetXFactor) && Math.abs(shot.targetXFactor) > 0.2) {
+        pts += 20; label = "Beat the keeper!";
+      }
       shot.scored = true;
-      youScore++; goals++; results[shotIndex] = "goal";
+      goals++; totalPoints += pts;
+      if (mode === "survival") streak++;
+      if (mode === "classic") { youScore++; results[shotIndex] = "goal"; }
       triggerNetWobble();
       flashMessage("GOAL!", "goal");
-    } else if (onTarget && saved) {
+      Sound.goal();
+      showPoints("+" + pts + " — " + label, "var(--accent)");
+    } else if (outcome === "save") {
       shot.saved = true;
-      keeperScore++; savedOrMissed++; results[shotIndex] = "miss";
-      // make keeper snap to ball for save feel
+      savedOrMissed++;
+      if (mode === "classic") { keeperScore++; results[shotIndex] = "miss"; }
       flashMessage("SAVED!", "save");
+      Sound.save();
+      showPoints("No points", "#fbbf24");
     } else {
-      keeperScore++; savedOrMissed++; results[shotIndex] = "miss";
+      savedOrMissed++;
+      if (mode === "classic") { keeperScore++; results[shotIndex] = "miss"; }
       flashMessage("MISS!", "miss");
+      Sound.miss();
+      showPoints("Off target", "#f87171");
     }
     updateHUD();
 
     state = "resolving";
-    setTimeout(nextShot, 1300);
+    const survivalFail = (mode === "survival" && outcome !== "goal");
+    setTimeout(() => { if (survivalFail) endGame(); else nextShot(); }, 1300);
   }
 
   function nextShot() {
     shotIndex++;
-    if (shotIndex >= TOTAL_SHOTS) {
-      endGame();
-      return;
-    }
-    // reset for next
-    keeper.dive = keeper.targetDive = 0;
-    keeper.jump = keeper.targetJump = 0;
-    keeper.chosen = false;
-    keeper.guess = undefined;
+    if (shotIndex >= MODES[mode].shots) { endGame(); return; }
+    resetKeeper();
     shot = null;
     resetBall();
     state = "aiming";
     updateHUD();
-    showHint(true);
-    setTimeout(() => showHint(false), 2500);
   }
 
   function endGame() {
     state = "over";
-    const win = youScore > keeperScore;
-    const draw = youScore === keeperScore;
+    let scoreVal;
+    if (mode === "classic") scoreVal = youScore;
+    else if (mode === "competition") scoreVal = totalPoints;
+    else scoreVal = streak;
+
+    const prev = high[mode] || 0;
+    let isBest = false;
+    if (scoreVal > prev) { high[mode] = scoreVal; saveHigh(); isBest = true; }
+
     const title = document.getElementById("winTitle");
     const sub = document.getElementById("winSub");
     const fs = document.getElementById("finalScore");
-    fs.textContent = youScore + " – " + keeperScore;
-    if (win) {
-      title.textContent = "You Win! 🏆";
-      sub.textContent = "Clinical from the spot.";
-    } else if (draw) {
-      title.textContent = "It's a Draw";
-      sub.textContent = "Honours even.";
+
+    if (mode === "classic") {
+      const win = youScore > keeperScore, draw = youScore === keeperScore;
+      fs.textContent = youScore + " – " + keeperScore;
+      if (win) { title.textContent = "You Win! 🏆"; sub.textContent = "Clinical from the spot."; }
+      else if (draw) { title.textContent = "It's a Draw"; sub.textContent = "Honours even."; }
+      else { title.textContent = "Keeper Wins"; sub.textContent = "Beaten by the gloves."; }
+    } else if (mode === "competition") {
+      title.textContent = "Full Time";
+      sub.textContent = goals + " of " + MODES.competition.shots + " scored";
+      fs.textContent = totalPoints + " pts";
     } else {
-      title.textContent = "Keeper Wins";
-      sub.textContent = "Beaten by the gloves.";
+      title.textContent = streak > 0 ? "Run Over" : "No Luck";
+      sub.textContent = streak === 1 ? "1 goal before the slip" : streak + " in a row · " + totalPoints + " pts";
+      fs.textContent = streak + " streak";
     }
+
+    newBestEl.classList.toggle("show", isBest);
+    hudEl.classList.remove("show");
     overlay.classList.add("show");
   }
 
-  document.getElementById("playAgain").addEventListener("click", newGame);
+  function triggerNetWobble() { netWobble = 1; netWobbleT = performance.now(); }
 
-  function triggerNetWobble() {
-    netWobble = 1;
-    netWobbleT = performance.now();
-  }
+  // ---- Buttons ----
+  document.getElementById("startBtn").addEventListener("click", () => startGame(selectedMode));
+  document.getElementById("playAgain").addEventListener("click", () => startGame(mode));
+  document.getElementById("menuBtn").addEventListener("click", showMenu);
+
+  document.querySelectorAll(".modeBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".modeBtn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedMode = btn.dataset.mode;
+      refreshStartScreen();
+    });
+  });
+
+  function renderMute() { muteBtn.textContent = Sound.isMuted() ? "🔇" : "🔊"; }
+  muteBtn.addEventListener("click", () => { Sound.ensure(); Sound.toggleMute(); renderMute(); });
+  renderMute();
 
   // ---- Rendering ----
   function draw(now) {
@@ -521,17 +786,14 @@
   }
 
   function drawBackground() {
-    // Sky / stadium backdrop
     const sky = ctx.createLinearGradient(0, 0, 0, field.horizonY);
     sky.addColorStop(0, "#1a2a44");
     sky.addColorStop(1, "#2e4a6b");
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, W, field.horizonY);
 
-    // crowd band
     ctx.fillStyle = "#22324a";
     ctx.fillRect(0, field.horizonY - H * 0.10, W, H * 0.10);
-    // speckles for crowd
     ctx.save();
     ctx.globalAlpha = 0.5;
     for (let i = 0; i < 60; i++) {
@@ -542,14 +804,12 @@
     }
     ctx.restore();
 
-    // Grass with perspective stripes
     const grad = ctx.createLinearGradient(0, field.horizonY, 0, H);
     grad.addColorStop(0, "#2f7d36");
     grad.addColorStop(1, "#3fa34a");
     ctx.fillStyle = grad;
     ctx.fillRect(0, field.horizonY, W, H - field.horizonY);
 
-    // Horizontal depth stripes
     for (let i = 0; i < 8; i++) {
       const a = i / 8, b = (i + 1) / 8;
       const yA = field.horizonY + (H - field.horizonY) * a * a;
@@ -560,13 +820,11 @@
       }
     }
 
-    // Penalty arc & spot
     ctx.strokeStyle = "rgba(255,255,255,0.55)";
     ctx.lineWidth = Math.max(2, W * 0.004);
     ctx.beginPath();
     ctx.ellipse(W/2, field.ballStartY + ball.r*0.2, field.goalW*0.30, field.goalH*0.10, 0, Math.PI*1.15, Math.PI*1.85);
     ctx.stroke();
-    // spot
     ctx.fillStyle = "rgba(255,255,255,0.8)";
     ctx.beginPath();
     ctx.ellipse(W/2, field.ballStartY + ball.r*1.05, ball.r*0.28, ball.r*0.12, 0, 0, Math.PI*2);
@@ -574,7 +832,6 @@
   }
 
   function drawGoalBack() {
-    // subtle shadow behind goal mouth (depth)
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,0.18)";
     ctx.fillRect(field.mouthX, field.mouthY, field.mouthW, field.mouthH);
@@ -582,7 +839,6 @@
   }
 
   function drawNet(now) {
-    // Net inside the goal mouth, with wobble when scored.
     let wob = 0;
     if (netWobble > 0) {
       const dt = (now - netWobbleT) / 1000;
@@ -625,23 +881,19 @@
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 3;
     const t = field.postT;
-    // left post
     ctx.fillRect(field.goalX, field.goalY, t, field.goalH);
-    // right post
     ctx.fillRect(field.goalX + field.goalW - t, field.goalY, t, field.goalH);
-    // crossbar
     ctx.fillRect(field.goalX, field.goalY, field.goalW, t);
     ctx.restore();
   }
 
   function drawKeeper(now) {
-    // Animate dive/jump toward targets
     keeper.dive += (keeper.targetDive - keeper.dive) * 0.18;
     keeper.jump += (keeper.targetJump - keeper.jump) * 0.18;
 
     const mouthCx = field.mouthX + field.mouthW / 2;
     const kx = mouthCx + keeper.dive * (field.mouthW * 0.42);
-    const baseY = field.mouthY + field.mouthH; // goal line
+    const baseY = field.mouthY + field.mouthH;
     const jumpPx = keeper.jump * field.mouthH * 0.55;
     const ky = baseY - jumpPx;
 
@@ -651,7 +903,6 @@
     ctx.save();
     ctx.translate(kx, ky);
 
-    // shadow on ground
     ctx.save();
     ctx.translate(0, baseY - ky);
     ctx.globalAlpha = 0.25 * (1 - keeper.jump * 0.6);
@@ -661,24 +912,19 @@
     ctx.fill();
     ctx.restore();
 
-    // lean in dive direction
     const lean = keeper.dive * 0.5;
     ctx.rotate(lean);
 
     const kit = "#ff5a3c";
-    const kitDark = "#e0431f";
 
-    // legs
     ctx.fillStyle = "#222";
     ctx.fillRect(-bodyW*0.36, 0, bodyW*0.3, bodyH*0.42);
     ctx.fillRect(bodyW*0.06, 0, bodyW*0.3, bodyH*0.42);
 
-    // body
     ctx.fillStyle = kit;
     roundRect(ctx, -bodyW/2, -bodyH*0.55, bodyW, bodyH*0.62, bodyW*0.25);
     ctx.fill();
 
-    // arms raised (spread wider when diving/jumping)
     ctx.strokeStyle = kit;
     ctx.lineWidth = bodyW * 0.32;
     ctx.lineCap = "round";
@@ -691,14 +937,12 @@
     ctx.moveTo(bodyW*0.30, armY);
     ctx.lineTo(bodyW*0.30 + handLen*armSpread, armY - handLen*0.7);
     ctx.stroke();
-    // gloves
     ctx.fillStyle = "#fff";
     ctx.beginPath();
     ctx.arc(-bodyW*0.30 - handLen*armSpread, armY - handLen*0.7, bodyW*0.22, 0, Math.PI*2);
     ctx.arc(bodyW*0.30 + handLen*armSpread, armY - handLen*0.7, bodyW*0.22, 0, Math.PI*2);
     ctx.fill();
 
-    // head
     ctx.fillStyle = "#f1c27d";
     ctx.beginPath();
     ctx.arc(0, -bodyH*0.66, bodyW*0.34, 0, Math.PI*2);
@@ -719,40 +963,32 @@
   }
 
   function updateBall(now) {
-    if (state === "aiming") {
-      ball.x = field.ballStartX;
-      ball.y = field.ballStartY;
+    if (state === "aiming" || state === "menu") {
+      if (!aiming) { ball.x = field.ballStartX; ball.y = field.ballStartY; }
       ball.scale = 1;
       return;
     }
     if (!shot || !ball.flying) return;
     const tRaw = (now - shot.t0) / shot.duration;
     const t = Math.min(tRaw, 1);
-    // ease out slightly
     const et = t;
     ball.x = shot.fromX + (shot.landX - shot.fromX) * et;
-    // base vertical interpolation + arc (parabola peaks mid-flight)
     const baseY = shot.fromY + (shot.landY - shot.fromY) * et;
     const arc = Math.sin(t * Math.PI) * shot.arc;
     ball.y = baseY - arc;
-    // perspective shrink as it goes away
     ball.scale = 1 - 0.55 * et;
     ball.spin += 0.4 * shot.spinDir;
 
-    if (tRaw >= 1 && !shot.resolved) {
-      resolveShot();
-    }
+    if (tRaw >= 1 && !shot.resolved) resolveShot();
   }
 
   function drawBall(now) {
     const r = ball.r * ball.scale;
-    // ground shadow
-    if (state !== "aiming") {
+    if (state !== "aiming" && state !== "menu") {
       ctx.save();
       ctx.globalAlpha = 0.22 * ball.scale;
       ctx.fillStyle = "#000";
       ctx.beginPath();
-      const shY = (field.mouthY + field.mouthH) + r*0.4;
       ctx.ellipse(ball.x, Math.max(ball.y + r*1.4, ball.y + r), r*1.0, r*0.35, 0, 0, Math.PI*2);
       ctx.fill();
       ctx.restore();
@@ -762,7 +998,6 @@
     ctx.translate(ball.x, ball.y);
     ctx.rotate(ball.spin);
 
-    // ball base
     const g = ctx.createRadialGradient(-r*0.3, -r*0.3, r*0.2, 0, 0, r);
     g.addColorStop(0, "#ffffff");
     g.addColorStop(1, "#d8d8d8");
@@ -771,7 +1006,6 @@
     ctx.arc(0, 0, r, 0, Math.PI*2);
     ctx.fill();
 
-    // pentagon-ish spots
     ctx.fillStyle = "#1b1b1b";
     const spots = 5;
     ctx.beginPath();
@@ -785,7 +1019,6 @@
       ctx.arc(px, py, r*0.14, 0, Math.PI*2);
       ctx.fill();
     }
-    // rim
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -802,15 +1035,9 @@
     const len = Math.hypot(dx, dy);
     const maxDrag = Math.min(W, H) * 0.42;
     const power = Math.min(len / maxDrag, 1);
-
-    // The shot goes OPPOSITE-ish? No: drag from ball toward target. Show line from ball to pointer,
-    // and a projected aim point toward the goal.
     const ang = Math.atan2(dy, dx);
 
-    // Projected direction (ball travels in drag direction)
     ctx.save();
-
-    // Power arc / line
     ctx.strokeStyle = `rgba(255, ${Math.round(213 - power*120)}, 79, 0.9)`;
     ctx.lineWidth = Math.max(4, ball.r * 0.35);
     ctx.lineCap = "round";
@@ -821,7 +1048,6 @@
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Arrowhead at pointer
     const ah = ball.r * 0.7;
     ctx.fillStyle = `rgba(255, ${Math.round(213 - power*120)}, 79, 0.95)`;
     ctx.translate(aimCur.x, aimCur.y);
@@ -834,7 +1060,6 @@
     ctx.fill();
     ctx.restore();
 
-    // Power meter ring around the ball
     ctx.save();
     ctx.translate(ball.x, ball.y);
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
@@ -842,8 +1067,7 @@
     ctx.beginPath();
     ctx.arc(0, 0, ball.r*1.5, 0, Math.PI*2);
     ctx.stroke();
-    // power fill
-    const hue = 120 - power*120; // green->red
+    const hue = 120 - power*120;
     ctx.strokeStyle = `hsl(${hue}, 85%, 55%)`;
     ctx.lineWidth = ball.r*0.28;
     ctx.lineCap = "round";
@@ -854,11 +1078,11 @@
   }
 
   // ---- Boot ----
-  window.addEventListener("resize", () => { resize(); if (state === "aiming") resetBall(); });
-  window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state==="aiming") resetBall(); }, 200));
+  window.addEventListener("resize", () => { resize(); if (state === "aiming" || state === "menu") resetBall(); });
+  window.addEventListener("orientationchange", () => setTimeout(() => { resize(); if (state === "aiming" || state === "menu") resetBall(); }, 200));
 
   resize();
-  newGame();
+  showMenu();
   requestAnimationFrame(draw);
 })();
 </script>
