@@ -184,6 +184,7 @@ const WALL_T   = 40;           // wall thickness
 const FLOOR_Y  = 1200;         // y of the floor top surface
 const CELL     = 30;           // tetromino cell size
 const SPAWN_GAP = 6 * CELL;    // how far above the pile a new piece appears
+const VIEW_H_MIN = 24 * CELL;  // always keep at least this much world-height visible
 
 // ---- DOM ----
 const canvas = document.getElementById('game');
@@ -204,11 +205,16 @@ function resize(){
   cssW = window.innerWidth; cssH = window.innerHeight;
   canvas.width = Math.floor(cssW * DPR);
   canvas.height = Math.floor(cssH * DPR);
-  // scale so the full field width fits with a little side margin
-  scale = cssW / (W + WALL_T * 2 + 24);
+  // Fit the field width, but never zoom in so far that we lose vertical
+  // context: on wide/landscape windows the height constraint dominates so
+  // we letterbox the (narrow) field horizontally instead of over-zooming.
+  const fitWidth  = cssW / (W + WALL_T * 2 + 24);
+  const fitHeight = cssH / VIEW_H_MIN;
+  scale = Math.min(fitWidth, fitHeight);
   viewW = cssW / scale;
   viewH = cssH / scale;
 }
+function groundViewTop(){ return FLOOR_Y - viewH + 64; }
 window.addEventListener('resize', resize);
 resize();
 
@@ -341,7 +347,7 @@ let state = 'start';        // start | playing | over
 let score = 0;
 let height = 0, maxHeight = 0, displayHeight = 0;
 let bestHeight = parseFloat(localStorage.getItem('gravstack_best')||'0')||0;
-let viewTop = FLOOR_Y - viewH + 80;   // world y at top of screen
+let viewTop = groundViewTop();   // world y at top of screen
 let targetViewTop = viewTop;
 let shake = 0;
 let danger = false, dangerWasOn = false;
@@ -389,9 +395,8 @@ function spawnControlled(){
   const type = nextType || newType();
   nextType = newType();
   const piece = buildPiece(type, 0);
-  // spawn above current pile
-  const topY = currentTop();
-  let y = Math.min(topY - SPAWN_GAP, viewTop + 4*CELL);
+  // spawn a fixed distance above the current pile top
+  const y = currentTop() - SPAWN_GAP;
   controlled = { type, rot:0, x:W/2, y, piece };
   clampControlled();
   drawNextPreview();
@@ -459,7 +464,7 @@ function startGame(){
   state='playing';
   shake=0; danger=false; dangerWasOn=false; stillTimer=0; landingPending=false;
   spawnDelay=0;
-  viewTop = FLOOR_Y - viewH + 80; targetViewTop = viewTop;
+  viewTop = groundViewTop(); targetViewTop = viewTop;
   startScreen.classList.add('hidden');
   overScreen.classList.add('hidden');
   hud.style.display='block';
@@ -615,12 +620,12 @@ function evaluateDanger(dt){
 
 function updateCamera(dt){
   const top = currentTop();
-  const spawnY = controlled ? controlled.y : top - SPAWN_GAP;
-  const focus = Math.min(top, spawnY);
-  // keep focus point ~30% down from the top of the screen
-  targetViewTop = focus - viewH*0.30;
-  // never scroll below showing the floor
-  targetViewTop = Math.min(targetViewTop, FLOOR_Y - viewH + 80);
+  // Stay anchored to the ground (floor near the bottom of the screen) until
+  // the tower climbs high enough; then follow it upward, keeping the top of
+  // the stack comfortably below the top edge so the next piece is visible.
+  const ground = groundViewTop();
+  const follow = top - viewH*0.45;
+  targetViewTop = Math.min(ground, follow);
   viewTop += (targetViewTop - viewTop)*Math.min(1, dt*3.2);
 }
 
