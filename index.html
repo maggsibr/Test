@@ -245,21 +245,132 @@
   .destroy-btn:hover { background: rgba(255, 70, 70, 0.24); }
   .destroy-btn:active { transform: scale(0.97); }
   .destroy-btn[disabled] { opacity: 0.4; cursor: default; }
+
+  /* ---- Start screen ---- */
+  .start {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 24px;
+    background: radial-gradient(circle at 50% 35%, rgba(20,26,52,0.72), rgba(4,5,12,0.92));
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+    text-align: center;
+    transition: opacity 0.45s ease, visibility 0.45s ease;
+  }
+  .start.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .start .badge {
+    font-size: 40px;
+    filter: drop-shadow(0 0 18px rgba(110,168,255,0.6));
+    margin-bottom: 4px;
+  }
+  .start h1 {
+    margin: 0;
+    font-size: clamp(26px, 8vw, 46px);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #f3f5ff;
+    text-shadow: 0 4px 30px rgba(110, 168, 255, 0.5);
+  }
+  .start .sub {
+    margin: 6px 0 26px;
+    font-size: clamp(12px, 3.4vw, 15px);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .modes {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 580px;
+  }
+  .mode-card {
+    flex: 1 1 230px;
+    max-width: 270px;
+    min-height: 200px;
+    appearance: none;
+    cursor: pointer;
+    text-align: left;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    padding: 22px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+  }
+  .mode-card:hover, .mode-card:focus-visible {
+    transform: translateY(-4px);
+    border-color: rgba(150,180,255,0.55);
+    box-shadow: 0 16px 50px rgba(0,0,0,0.5);
+    background: rgba(26, 31, 52, 0.9);
+    outline: none;
+  }
+  .mode-card:active { transform: translateY(-1px) scale(0.99); }
+  .mode-card .mode-icon { font-size: 38px; line-height: 1; }
+  .mode-card .mode-name {
+    font-size: 21px; font-weight: 650; letter-spacing: 0.03em;
+  }
+  .mode-card .mode-desc { font-size: 13px; line-height: 1.5; color: var(--muted); }
+  .mode-card.blaster:hover, .mode-card.blaster:focus-visible { border-color: rgba(255,120,120,0.6); }
+  .mode-card .tag {
+    margin-top: auto;
+    align-self: flex-start;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid rgba(110,168,255,0.4);
+    border-radius: 999px;
+    padding: 4px 10px;
+  }
+  .mode-card.blaster .tag { color: #ff9b9b; border-color: rgba(255,120,120,0.45); }
 </style>
 </head>
 <body>
   <canvas id="stage"></canvas>
 
+  <div class="start" id="startScreen">
+    <div class="badge">🪐</div>
+    <h1>Solar System</h1>
+    <p class="sub">Choose how you want to experience it</p>
+    <div class="modes">
+      <button class="mode-card explore" data-mode="explore">
+        <span class="mode-icon">🔭</span>
+        <span class="mode-name">Explore</span>
+        <span class="mode-desc">Orbit the system and tap any planet or the Sun to read its facts. Peaceful — nothing gets destroyed.</span>
+        <span class="tag">Look &amp; learn</span>
+      </button>
+      <button class="mode-card blaster" data-mode="blaster">
+        <span class="mode-icon">🔫</span>
+        <span class="mode-name">Blaster</span>
+        <span class="mode-desc">Take aim and blast planets apart with your cannon. You can still scan them for data first.</span>
+        <span class="tag">Take aim</span>
+      </button>
+    </div>
+  </div>
+
   <div class="counter" id="counter">Planets: <b id="aliveCount">8</b> / 8</div>
 
   <div class="hud-top">
-    <h1>Solar System Blaster</h1>
+    <h1 id="hudTitle">Solar System</h1>
     <div class="target" id="targetLabel"></div>
   </div>
 
   <div class="hint" id="hint">Drag to aim &nbsp;&bull;&nbsp; FIRE to destroy a planet &nbsp;&bull;&nbsp; Tap a planet to scan it</div>
 
   <div class="controls">
+    <button class="btn" id="menuBtn" title="Change mode" aria-label="Change mode">⌂</button>
     <button class="btn" id="playBtn" title="Pause / Play" aria-label="Pause or play">⏸</button>
     <div class="slider-wrap">
       <span>Speed</span>
@@ -388,6 +499,7 @@
 
   // ---------- State ----------
   let paused = false, speedMul = 1, lastT = performance.now();
+  let mode = null;                 // "explore" | "blaster" | null (start screen)
   let selected = null;
   let currentTarget = null;        // planet under the crosshair
   let shake = 0;
@@ -502,7 +614,8 @@
 
     if (currentTarget === p) {
       ctx.beginPath(); ctx.arc(s.x, s.y, r + 7, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(255,90,90,0.9)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = mode === "blaster" ? "rgba(255,90,90,0.9)" : "rgba(180,210,255,0.85)";
+      ctx.lineWidth = 2; ctx.stroke();
     }
     if (r > 7) {
       ctx.font = "600 12px -apple-system, Segoe UI, Roboto, sans-serif";
@@ -659,11 +772,13 @@
     for (const b of bodies) (b.isSun ? drawSun(t) : drawPlanet(b));
 
     drawParticles(lastDt);
-    drawBeams(t);
+    if (mode === "blaster") drawBeams(t);
     ctx.restore();
 
-    drawGun();
-    drawCrosshair();
+    if (mode === "blaster") {
+      drawGun();
+      drawCrosshair();
+    }
   }
 
   let lastDt = 0.016;
@@ -680,17 +795,23 @@
   const targetLabel = document.getElementById("targetLabel");
   const aliveCountEl = document.getElementById("aliveCount");
   function updateHud() {
-    const alive = PLANETS.filter(p => p.alive).length;
-    aliveCountEl.textContent = alive;
-    if (alive === 0) {
-      targetLabel.textContent = "ALL PLANETS DESTROYED — press ↺ to respawn";
-      targetLabel.classList.remove("locked");
-    } else if (currentTarget) {
-      targetLabel.textContent = "◎ TARGET LOCKED: " + currentTarget.name.toUpperCase();
-      targetLabel.classList.add("locked");
+    if (!mode) { targetLabel.textContent = ""; return; }
+    if (mode === "blaster") {
+      const alive = PLANETS.filter(p => p.alive).length;
+      aliveCountEl.textContent = alive;
+      if (alive === 0) {
+        targetLabel.textContent = "ALL PLANETS DESTROYED — press ↺ to respawn";
+        targetLabel.classList.remove("locked");
+      } else if (currentTarget) {
+        targetLabel.textContent = "◎ TARGET LOCKED: " + currentTarget.name.toUpperCase();
+        targetLabel.classList.add("locked");
+      } else {
+        targetLabel.textContent = "Aim at a planet…";
+        targetLabel.classList.remove("locked");
+      }
     } else {
-      targetLabel.textContent = "Aim at a planet…";
       targetLabel.classList.remove("locked");
+      targetLabel.textContent = currentTarget ? ("◎ " + currentTarget.name) : "";
     }
   }
 
@@ -722,6 +843,7 @@
   }
 
   function fire() {
+    if (mode !== "blaster") return;
     beams.push({ t: performance.now() });
     gunRecoil = 1;
     if (!destroyPlanet(currentTarget)) shake = Math.max(shake, 4); // miss: light kick
@@ -750,6 +872,7 @@
       f.querySelector(".value").textContent = b.facts[k];
       cardFacts.appendChild(f);
     }
+    cardDestroy.style.display = (mode === "blaster") ? "" : "none";
     if (b.isSun) {
       cardDestroy.disabled = true;
       cardDestroy.textContent = "☀ The Sun cannot be destroyed";
@@ -814,30 +937,66 @@
 
   // ---------- Controls ----------
   const playBtn = document.getElementById("playBtn");
+  const fireBtn = document.getElementById("fireBtn");
+  const counterEl = document.getElementById("counter");
+  const respawnBtn = document.getElementById("respawnBtn");
+  const menuBtn = document.getElementById("menuBtn");
+  const hudTitle = document.getElementById("hudTitle");
+  const startScreen = document.getElementById("startScreen");
+
   playBtn.addEventListener("click", () => { paused = !paused; playBtn.textContent = paused ? "▶" : "⏸"; });
   document.getElementById("speed").addEventListener("input", (e) => { speedMul = e.target.value / 100; });
-  document.getElementById("respawnBtn").addEventListener("click", () => {
+  respawnBtn.addEventListener("click", () => {
     for (const p of PLANETS) p.alive = true;
     particles.length = 0; rings.length = 0;
     hideHint();
   });
-
-  const fireBtn = document.getElementById("fireBtn");
   fireBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); fire(); });
   window.addEventListener("keydown", (e) => {
     if (e.code === "Space") { e.preventDefault(); fire(); }
   });
 
-  // ---------- Hint ----------
-  let hintHidden = false;
-  const hintEl = document.getElementById("hint");
-  function hideHint() {
-    if (hintHidden) return;
-    hintHidden = true;
-    hintEl.style.opacity = "0";
-    setTimeout(() => { hintEl.style.display = "none"; }, 700);
+  // ---------- Modes / start screen ----------
+  function applyModeUI() {
+    const blaster = mode === "blaster";
+    fireBtn.style.display = blaster ? "" : "none";
+    counterEl.style.display = blaster ? "" : "none";
+    respawnBtn.style.display = blaster ? "" : "none";
+    hudTitle.textContent = blaster ? "Solar System — Blaster" : "Solar System — Explore";
   }
-  setTimeout(hideHint, 7000);
+  function startMode(m) {
+    mode = m;
+    for (const p of PLANETS) p.alive = true;
+    particles.length = 0; rings.length = 0; beams.length = 0;
+    deselect();
+    paused = false; playBtn.textContent = "⏸";
+    applyModeUI();
+    startScreen.classList.add("hidden");
+    showHint(m === "blaster"
+      ? "Drag to aim  •  FIRE (or Space) to destroy  •  Tap a planet to scan it"
+      : "Drag to look around  •  Tap a planet or the Sun to read its facts");
+  }
+  function showStartScreen() { startScreen.classList.remove("hidden"); }
+
+  document.querySelectorAll(".mode-card").forEach((btn) => {
+    btn.addEventListener("click", () => startMode(btn.dataset.mode));
+  });
+  menuBtn.addEventListener("click", showStartScreen);
+
+  // ---------- Hint ----------
+  const hintEl = document.getElementById("hint");
+  let hintTimer = null;
+  function hideHint() {
+    hintEl.style.opacity = "0";
+    clearTimeout(hintTimer);
+  }
+  function showHint(text) {
+    hintEl.textContent = text;
+    hintEl.style.display = "";
+    hintEl.style.opacity = "1";
+    clearTimeout(hintTimer);
+    hintTimer = setTimeout(hideHint, 6500);
+  }
 
   // ---------- Events ----------
   window.addEventListener("resize", resize);
@@ -859,6 +1018,7 @@
   // ---------- Go ----------
   resize();
   makeStars();
+  applyModeUI();        // start screen is up; hide blaster-only UI until a mode is picked
   requestAnimationFrame(loop);
 })();
 </script>
