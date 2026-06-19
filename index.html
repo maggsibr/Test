@@ -49,8 +49,12 @@
   }
   .hud-card .big { font-size: 22px; font-weight: 700; }
   .hud-card .small { font-size: 12px; opacity: .85; letter-spacing: .3px; text-transform: uppercase; }
-  #shotTrack {
+  #shotTrack, #shotTrackR {
     display: flex; gap: 6px; margin-top: 6px;
+  }
+  #shotTrackR { justify-content: flex-end; }
+  .hud-card.active-player {
+    box-shadow: 0 0 0 2px var(--accent), 0 0 18px rgba(255,213,79,.5);
   }
   .pip {
     width: 12px; height: 12px; border-radius: 50%;
@@ -76,6 +80,7 @@
   #message.goal { color: #4ade80; }
   #message.save { color: #fbbf24; }
   #message.miss { color: #f87171; }
+  #message.turn { color: #fff; font-size: clamp(34px, 8vw, 52px); }
 
   /* Points popup */
   #pointsPopup {
@@ -199,6 +204,7 @@
       <div class="small" id="rightLabel">Keeper</div>
       <div class="big" id="rightVal">0</div>
       <div class="small" id="rightSub" style="margin-top:6px">Best 0/5</div>
+      <div id="shotTrackR"></div>
     </div>
   </div>
 
@@ -214,6 +220,7 @@
       <button class="modeBtn active" data-mode="classic">Classic</button>
       <button class="modeBtn" data-mode="competition">Competition</button>
       <button class="modeBtn" data-mode="survival">Survival</button>
+      <button class="modeBtn" data-mode="twoplayer">2 Players</button>
     </div>
     <div class="modeDesc" id="modeDesc"></div>
     <div class="hiRow">Best: <span id="startHigh">—</span></div>
@@ -255,6 +262,10 @@
     survival: {
       label: "Survival", shots: Infinity,
       desc: "Keep scoring to build your streak. One save or miss and the run is over — how long can you last?"
+    },
+    twoplayer: {
+      label: "2 Players", shots: 5,
+      desc: "Pass-and-play duel. Two players take five penalties each against the keeper — most goals wins, sudden death if level."
     },
   };
 
@@ -384,6 +395,11 @@
   let streak = 0;                       // survival
   const results = [];                   // 'goal' | 'miss' (classic pips)
 
+  // Two-player duel
+  let p1Goals = 0, p2Goals = 0;
+  const p1Results = [], p2Results = [];
+  let currentPlayer = 1, round = 0;
+
   const ball = { x: 0, y: 0, r: 0, scale: 1, spin: 0, flying: false };
   const keeper = { dive: 0, targetDive: 0, jump: 0, targetJump: 0, chosen: false, guess: 0, decisionTime: 0 };
 
@@ -417,12 +433,14 @@
   const rightVal = document.getElementById("rightVal");
   const rightSub = document.getElementById("rightSub");
   const trackEl = document.getElementById("shotTrack");
+  const trackREl = document.getElementById("shotTrackR");
+  const cardLeft = document.getElementById("cardLeft");
+  const cardRight = document.getElementById("cardRight");
   const messageEl = document.getElementById("message");
   const pointsPopupEl = document.getElementById("pointsPopup");
   const overlay = document.getElementById("overlay");
   const hintEl = document.getElementById("hint");
   const startScreen = document.getElementById("startScreen");
-  const startHighEl = document.getElementById("startHigh");
   const modeDescEl = document.getElementById("modeDesc");
   const newBestEl = document.getElementById("newBest");
   const muteBtn = document.getElementById("muteBtn");
@@ -435,9 +453,14 @@
     return v + " in a row";
   }
 
+  const hiRowEl = document.querySelector(".hiRow");
   function refreshStartScreen() {
     modeDescEl.textContent = MODES[selectedMode].desc;
-    startHighEl.textContent = highText(selectedMode);
+    if (selectedMode === "twoplayer") {
+      hiRowEl.innerHTML = "Local pass &amp; play · most goals wins";
+    } else {
+      hiRowEl.innerHTML = 'Best: <span>' + highText(selectedMode) + "</span>";
+    }
   }
 
   function showMenu() {
@@ -466,6 +489,9 @@
     goals = savedOrMissed = 0;
     totalPoints = 0; streak = 0;
     results.length = 0;
+    p1Goals = p2Goals = 0;
+    p1Results.length = p2Results.length = 0;
+    currentPlayer = 1; round = 0;
     state = "aiming";
     resetKeeper();
     resetBall();
@@ -474,27 +500,47 @@
     newBestEl.classList.remove("show");
     hudEl.classList.add("show");
     updateHUD();
-    showHint(true);
-    setTimeout(() => { if (state === "aiming" && shotIndex === 0) showHint(false); }, 3200);
+    if (mode === "twoplayer") {
+      announceTurn();
+    } else {
+      hintEl.textContent = "Drag from the ball to aim & set power — release to shoot";
+      showHint(true);
+      setTimeout(() => { if (state === "aiming" && shotIndex === 0) showHint(false); }, 3200);
+    }
   }
 
   // ---- HUD ----
-  function renderPips() {
-    trackEl.innerHTML = "";
-    for (let i = 0; i < MODES.classic.shots; i++) {
+  function renderPips(el, arr, n) {
+    el.innerHTML = "";
+    for (let i = 0; i < n; i++) {
       const p = document.createElement("div");
       p.className = "pip";
-      if (results[i] === "goal") p.classList.add("goal");
-      else if (results[i] === "miss") p.classList.add("miss");
-      trackEl.appendChild(p);
+      if (arr[i] === "goal") p.classList.add("goal");
+      else if (arr[i] === "miss") p.classList.add("miss");
+      el.appendChild(p);
     }
   }
 
   function updateHUD() {
     const shots = MODES[mode].shots;
+    cardLeft.classList.remove("active-player");
+    cardRight.classList.remove("active-player");
+    trackREl.style.display = "none";
+    if (mode === "twoplayer") {
+      const reg = MODES.twoplayer.shots;
+      leftLabel.textContent = "Player 1"; leftVal.textContent = p1Goals;
+      trackEl.style.display = "flex"; renderPips(trackEl, p1Results, reg);
+      rightLabel.textContent = "Player 2"; rightVal.textContent = p2Goals;
+      rightSub.textContent = "";
+      trackREl.style.display = "flex"; renderPips(trackREl, p2Results, reg);
+      centerLabel.textContent = round < reg ? "Round" : "Sudden death";
+      centerVal.textContent = round < reg ? (round + 1) + " / " + reg : "SD " + (round - reg + 1);
+      (currentPlayer === 1 ? cardLeft : cardRight).classList.add("active-player");
+      return;
+    }
     if (mode === "classic") {
       leftLabel.textContent = "You"; leftVal.textContent = youScore;
-      trackEl.style.display = "flex"; renderPips();
+      trackEl.style.display = "flex"; renderPips(trackEl, results, MODES.classic.shots);
       centerLabel.textContent = "Penalty";
       centerVal.textContent = Math.min(shotIndex + 1, shots) + " / " + shots;
       rightLabel.textContent = "Keeper"; rightVal.textContent = keeperScore;
@@ -680,6 +726,7 @@
       goals++; totalPoints += pts;
       if (mode === "survival") streak++;
       if (mode === "classic") { youScore++; results[shotIndex] = "goal"; }
+      if (mode === "twoplayer") recordDuel("goal");
       triggerNetWobble();
       flashMessage("GOAL!", "goal");
       Sound.goal();
@@ -688,12 +735,14 @@
       shot.saved = true;
       savedOrMissed++;
       if (mode === "classic") { keeperScore++; results[shotIndex] = "miss"; }
+      if (mode === "twoplayer") recordDuel("miss");
       flashMessage("SAVED!", "save");
       Sound.save();
       showPoints("No points", "#fbbf24");
     } else {
       savedOrMissed++;
       if (mode === "classic") { keeperScore++; results[shotIndex] = "miss"; }
+      if (mode === "twoplayer") recordDuel("miss");
       flashMessage("MISS!", "miss");
       Sound.miss();
       showPoints("Off target", "#f87171");
@@ -702,7 +751,39 @@
 
     state = "resolving";
     const survivalFail = (mode === "survival" && outcome !== "goal");
-    setTimeout(() => { if (survivalFail) endGame(); else nextShot(); }, 1300);
+    setTimeout(() => {
+      if (survivalFail) endGame();
+      else if (mode === "twoplayer") advanceTurn();
+      else nextShot();
+    }, 1300);
+  }
+
+  function recordDuel(res) {
+    if (currentPlayer === 1) { p1Results[round] = res; if (res === "goal") p1Goals++; }
+    else { p2Results[round] = res; if (res === "goal") p2Goals++; }
+  }
+
+  function announceTurn() {
+    hintEl.textContent = "Player " + currentPlayer + " — drag from the ball to shoot";
+    showHint(true);
+    flashMessage("Player " + currentPlayer, "turn");
+  }
+
+  function advanceTurn() {
+    if (currentPlayer === 1) {
+      currentPlayer = 2;
+    } else {
+      currentPlayer = 1;
+      round++;
+      // After a completed round at or beyond regulation, end if there's a leader.
+      if (round >= MODES.twoplayer.shots && p1Goals !== p2Goals) { endGame(); return; }
+    }
+    resetKeeper();
+    shot = null;
+    resetBall();
+    state = "aiming";
+    updateHUD();
+    announceTurn();
   }
 
   function nextShot() {
@@ -717,6 +798,24 @@
 
   function endGame() {
     state = "over";
+
+    if (mode === "twoplayer") {
+      const p1win = p1Goals > p2Goals;
+      document.getElementById("finalScore").textContent = p1Goals + " – " + p2Goals;
+      const t = document.getElementById("winTitle");
+      const s = document.getElementById("winSub");
+      if (p1Goals === p2Goals) {
+        t.textContent = "It's a Draw"; s.textContent = "Deadlocked from the spot.";
+      } else {
+        t.textContent = "Player " + (p1win ? "1" : "2") + " Wins! 🏆";
+        s.textContent = (p1win ? "Player 1" : "Player 2") + " takes the bragging rights.";
+      }
+      newBestEl.classList.remove("show");
+      hudEl.classList.remove("show");
+      overlay.classList.add("show");
+      return;
+    }
+
     let scoreVal;
     if (mode === "classic") scoreVal = youScore;
     else if (mode === "competition") scoreVal = totalPoints;
