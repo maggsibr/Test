@@ -214,7 +214,12 @@ function resize(){
   viewW = cssW / scale;
   viewH = cssH / scale;
 }
-function groundViewTop(){ return FLOOR_Y - viewH + 64; }
+function groundViewTop(){
+  // Place the floor a fixed number of CSS pixels above the bottom HUD bar so
+  // the landing zone is never hidden behind the Drop/Rotate buttons.
+  const bottomHudCss = 124;
+  return FLOOR_Y - (cssH - bottomHudCss)/scale;
+}
 window.addEventListener('resize', resize);
 resize();
 
