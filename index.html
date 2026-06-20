@@ -720,8 +720,10 @@ function render(){
 
   // ---- world transform ----
   c.save();
-  c.translate(sx*DPR, sy*DPR);
-  c.scale(DPR*scale, DPR*scale);
+  // Base transform is already scaled by DPR, so shift/scale here in CSS-pixel
+  // space (multiplying by DPR again would double-apply the device ratio).
+  c.translate(sx, sy);
+  c.scale(scale, scale);
   const offX = (viewW - W)/2;          // center the field horizontally
   c.translate(offX, -viewTop);
 
