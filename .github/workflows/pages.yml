@@ -1,10 +1,10 @@
-name: Deploy Gravity Stack to GitHub Pages
+name: Deploy Starfall Explorer to GitHub Pages
 
 # Deploys the self-contained index.html to GitHub Pages.
 on:
   push:
     branches:
-      - claude/gravity-stack-game-dgjwwk
+      - claude/space-exploration-threejs-can6ar
   workflow_dispatch:
 
 permissions:
