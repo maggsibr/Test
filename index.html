@@ -267,10 +267,10 @@ const SHIPS = [
     stats:{ MAX_SPEED:320, BOOST_MULT:3.2, ATMO_CAP:420, TURN_SENS:0.0021, ROLL_SPEED:1.9, ACCEL:2.2 },
     camOffset:[0, 3.4, 11.5], build:()=>buildStarfall() },
   { name:'VIPER', cls:'FIGHTER', desc:'fast & agile', glow:0xff8844,
-    stats:{ MAX_SPEED:400, BOOST_MULT:3.6, ATMO_CAP:500, TURN_SENS:0.0028, ROLL_SPEED:2.6, ACCEL:3.0 },
+    stats:{ MAX_SPEED:600, BOOST_MULT:3.6, ATMO_CAP:680, TURN_SENS:0.0028, ROLL_SPEED:2.6, ACCEL:3.0 },
     camOffset:[0, 3.2, 11], build:()=>buildViper() },
   { name:'PHANTOM', cls:'INTERCEPTOR', desc:'blistering, twitchy', glow:0xb07fff,
-    stats:{ MAX_SPEED:480, BOOST_MULT:4.2, ATMO_CAP:560, TURN_SENS:0.0034, ROLL_SPEED:3.2, ACCEL:3.6 },
+    stats:{ MAX_SPEED:960, BOOST_MULT:4.2, ATMO_CAP:900, TURN_SENS:0.0034, ROLL_SPEED:3.2, ACCEL:3.6 },
     camOffset:[0, 3.0, 11.5], build:()=>buildPhantom() },
 ];
 
@@ -281,40 +281,48 @@ const SHIPS = [
    amp     : vertical terrain amplitude in metres
    freq    : continental noise frequency (bigger = smaller landmasses)
    ridged  : 0..1 blend towards sharp ridged noise (jagged mountains)
+   maskBias: mountain-region coverage — lower = more of the planet is
+             extreme terrain, higher = mostly calm plains
+   cliff   : bare-rock colour blended onto steep faces
    water   : sea level as 0..1 of the height range (null = no ocean)
    atmo    : rim-glow colour seen from orbit;  fog: sky/haze colour
    props   : which scatter models to use (see PROP_GEOS)
    ------------------------------------------------------------------ */
 const BIOMES = {
   VOLCANIC: {
-    amp: 110, freq: 3.2, detailFreq: 11, ridged: 0.85, water: null,
+    amp: 130, freq: 3.2, detailFreq: 11, ridged: 0.85, water: null,
+    maskBias: -0.10, cliff: 0x1a1315,
     colors: [[0.00,0xff4400],[0.10,0xdd3300],[0.22,0x551a10],[0.45,0x3a2420],[0.70,0x2a2226],[1.00,0x171317]],
     atmo: 0xff5522, fog: 0xb2402a, cloud: 0x442222, cloudOpacity: 0.5,
     props: { trees: 'spike', rocks: 'lava' },
   },
   OCEANIC: {
-    amp: 60, freq: 2.6, detailFreq: 9, ridged: 0.1, water: 0.52,
+    amp: 70, freq: 2.6, detailFreq: 9, ridged: 0.1, water: 0.52,
+    maskBias: 0.12, cliff: 0x7a6a55,
     colors: [[0.00,0x0d2b52],[0.45,0x14486e],[0.53,0xd8c391],[0.60,0x5a9e52],[0.80,0x3c7440],[1.00,0x9fb8a6]],
     waterColor: 0x1566aa,
     atmo: 0x5fb8ff, fog: 0x9fd4f4, cloud: 0xffffff, cloudOpacity: 0.85,
     props: { trees: 'palm', rocks: 'round' },
   },
   GLACIAL: {
-    amp: 85, freq: 3.0, detailFreq: 12, ridged: 0.45, water: 0.30,
+    amp: 100, freq: 3.0, detailFreq: 12, ridged: 0.45, water: 0.30,
+    maskBias: 0.02, cliff: 0x5c7285,
     colors: [[0.00,0x8fb8d8],[0.30,0xb8d8ec],[0.45,0xe8f2fa],[0.70,0xf4f9ff],[1.00,0xcfe4f2]],
     waterColor: 0x2b6f9e,
     atmo: 0xaadfff, fog: 0xcfe6f2, cloud: 0xffffff, cloudOpacity: 0.7,
     props: { trees: 'pine', rocks: 'grey' },
   },
   LUSH: {
-    amp: 55, freq: 2.8, detailFreq: 10, ridged: 0.2, water: 0.34,
+    amp: 65, freq: 2.8, detailFreq: 10, ridged: 0.2, water: 0.34,
+    maskBias: 0.15, cliff: 0x6b5f4c,
     colors: [[0.00,0x0e3c58],[0.32,0x2c6e50],[0.42,0x3f8a4a],[0.62,0x59a344],[0.82,0x6e7d4a],[1.00,0x9aa08c]],
     waterColor: 0x1b6f9e,
     atmo: 0x7fd4a8, fog: 0xa8d8c0, cloud: 0xffffff, cloudOpacity: 0.8,
     props: { trees: 'leafy', rocks: 'grey' },
   },
   BARREN: {
-    amp: 75, freq: 3.4, detailFreq: 13, ridged: 0.55, water: null,
+    amp: 110, freq: 3.4, detailFreq: 13, ridged: 0.55, water: null,
+    maskBias: -0.02, cliff: 0x453f39,
     colors: [[0.00,0x35322f],[0.30,0x55504a],[0.55,0x6e6862],[0.80,0x8a837c],[1.00,0xa39a90]],
     atmo: 0x8f8578, fog: 0x9a8f82, cloud: 0x998877, cloudOpacity: 0.18,
     props: { trees: null, rocks: 'grey' },
@@ -557,7 +565,7 @@ function initSky(){
 
   // decay 0 → the one sun lights every planet in the system
   scene.add(new THREE.PointLight(0xfff0dd, 2.2, 0, 0));
-  scene.add(new THREE.AmbientLight(0x46587a, 0.5)); // cool fill so shadow sides stay readable
+  scene.add(new THREE.AmbientLight(0x4e6088, 0.78)); // cool fill — keeps night sides readable
 }
 
 /* ==================================================================
@@ -571,10 +579,15 @@ function initSky(){
 function terrainRadius(p, dir){
   const b = p.biome, n = p.noise, o = p.noiseOffset;
   const x = dir.x + o, y = dir.y + o*1.7, z = dir.z + o*0.6;
-  const base   = n.fbm   (x*b.freq,       y*b.freq,       z*b.freq,       4);
+  // gentle continent-scale rolling everywhere
+  const base = n.fbm(x*b.freq, y*b.freq, z*b.freq, 3);
+  // region mask: most of the surface stays calm plains, selected regions
+  // become extreme terrain (mountain ranges, ridge fields, deep rifts)
+  const m = n.fbm(x*1.6+9.2, y*1.6+9.2, z*1.6+9.2, 2);
+  const mask = smoothstep(clamp((m - b.maskBias)/0.35, 0, 1));
   const ridge  = n.ridged(x*b.detailFreq, y*b.detailFreq, z*b.detailFreq, 4);
   const detail = n.fbm   (x*b.detailFreq, y*b.detailFreq, z*b.detailFreq, 3);
-  const h = base*0.72 + lerp(detail, ridge, b.ridged)*0.42; // ~ -1..1
+  const h = base*0.5 + mask * lerp(detail, ridge, b.ridged) * 1.5;
   let R = p.radius + h * b.amp;
   // large landmark features (volcano cones with crater rims) are part of
   // the height field itself, so they collide and can be climbed on foot
@@ -770,15 +783,28 @@ function createPlanet(index, biomeKey, center){
   const nVerts = posAttr.count;
   const colors = new Float32Array(nVerts*3);
   const col = new THREE.Color();
+  const cliffCol = new THREE.Color(p.biome.cliff ?? 0x6b5f4c);
+  const va=new THREE.Vector3(), vb=new THREE.Vector3(), vc=new THREE.Vector3(),
+        fn=new THREE.Vector3(), rad=new THREE.Vector3();
   for(let f=0; f<nVerts; f+=3){          // per triangle
     let tAvg = 0;
     for(let k=0;k<3;k++){
       _v1.fromBufferAttribute(posAttr, f+k).normalize();
       const R = terrainRadius(p, _v1);
       posAttr.setXYZ(f+k, _v1.x*R, _v1.y*R, _v1.z*R);
-      tAvg += clamp((R - p.radius)/p.biome.amp*0.5+0.5, 0, 1);
+      tAvg += clamp((R - p.radius)/(p.biome.amp*1.4)*0.5+0.5, 0, 1);
     }
     gradColor(p.biome.colors, tAvg/3, col);
+    // steep faces read as bare rock — makes mountain walls and canyon
+    // sides stand out from the height-gradient colouring
+    va.fromBufferAttribute(posAttr,f);
+    vb.fromBufferAttribute(posAttr,f+1);
+    vc.fromBufferAttribute(posAttr,f+2);
+    rad.copy(va).add(vb).add(vc).normalize();
+    vb.sub(va); vc.sub(va);
+    fn.crossVectors(vb,vc).normalize();
+    const slope = 1 - Math.abs(fn.dot(rad));   // 0 = level, 1 = vertical
+    col.lerp(cliffCol, smoothstep(clamp((slope-0.45)/0.35, 0, 1)) * 0.85);
     const jitter = 0.94 + p.rand()*0.1;  // subtle per-face tonal variation
     for(let k=0;k<3;k++){
       colors[(f+k)*3  ]=col.r*jitter;
@@ -1071,8 +1097,8 @@ function updateShip(dt){
   const AP = 600*dt;
   if(keys['ArrowLeft'])  mouseDX -= AP;
   if(keys['ArrowRight']) mouseDX += AP;
-  if(keys['ArrowUp'])    mouseDY -= AP;  // up = nose up (matches mouse)
-  if(keys['ArrowDown'])  mouseDY += AP;
+  if(keys['ArrowUp'])    mouseDY += AP;  // inverted flight-stick: up = nose down
+  if(keys['ArrowDown'])  mouseDY -= AP;
   const yaw   = -mouseDX * S.TURN_SENS;
   const pitch = -mouseDY * S.TURN_SENS;
   mouseDX = mouseDY = 0;
