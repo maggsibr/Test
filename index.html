@@ -80,6 +80,14 @@
   #reticle::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-.5px);}
   #reticle::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-.5px);}
 
+  /* planet navigation markers (projected over each planet in flight) */
+  .marker{
+    position:absolute;transform:translate(-50%,-50%);pointer-events:none;
+    text-align:center;font-size:10px;letter-spacing:.12em;line-height:1.5;
+    text-shadow:0 0 8px rgba(0,0,0,.9);white-space:nowrap;opacity:.85;
+  }
+  .marker .dia{font-size:13px;}
+
   /* cinematic vignette */
   #vignette{
     position:fixed;inset:0;pointer-events:none;z-index:5;
@@ -154,6 +162,7 @@
   </div>
   <div id="prompt"></div>
   <div id="reticle"></div>
+  <div id="markers"></div>
 </div>
 
 <!-- ================= start / pause overlay ================= -->
@@ -162,6 +171,7 @@
   <div class="sub">// EXPLORER — PROCEDURAL FRONTIER //</div>
   <table>
     <tr><td class="k">MOUSE</td><td>steer ship / look</td></tr>
+    <tr><td class="k">ARROWS</td><td>steer with keys instead</td></tr>
     <tr><td class="k">W / S</td><td>thrust up / down</td></tr>
     <tr><td class="k">A / D</td><td>roll (ship) — strafe (on foot)</td></tr>
     <tr><td class="k">SPACE</td><td>boost (ship) — jump (on foot)</td></tr>
@@ -234,7 +244,7 @@ const CONFIG = {
   BLOOM: { strength: 0.45, radius: 0.6, threshold: 0.82 },
 
   STARS  : 9000,                        // starfield point count
-  PROPS  : { trees: 240, rocks: 150 },  // scattered per planet (biome permitting)
+  PROPS  : { trees: 460, rocks: 200 },  // scattered per planet (biome permitting)
 };
 
 /* ------------------------------------------------------------------
@@ -565,7 +575,19 @@ function terrainRadius(p, dir){
   const ridge  = n.ridged(x*b.detailFreq, y*b.detailFreq, z*b.detailFreq, 4);
   const detail = n.fbm   (x*b.detailFreq, y*b.detailFreq, z*b.detailFreq, 3);
   const h = base*0.72 + lerp(detail, ridge, b.ridged)*0.42; // ~ -1..1
-  return p.radius + h * b.amp;
+  let R = p.radius + h * b.amp;
+  // large landmark features (volcano cones with crater rims) are part of
+  // the height field itself, so they collide and can be climbed on foot
+  if(p.features) for(const f of p.features){
+    const ang = Math.acos(clamp(dir.dot(f.dir), -1, 1));
+    const t = 1 - ang/f.r;
+    if(t > 0){
+      const cone   = Math.pow(t, 1.4);
+      const crater = t > 0.75 ? Math.pow((t-0.75)/0.25, 2) * 0.55 : 0;
+      R += f.h * (cone - crater);
+    }
+  }
+  return R;
 }
 /* normalised 0..1 height, used for colouring / prop placement rules */
 function terrainT(p, dir){
@@ -657,9 +679,18 @@ const PROP_GEOS = {
     [new THREE.CylinderGeometry(0.22,0.4,3.4,5), 0x8a6a45, 1.7],
     [new THREE.IcosahedronGeometry(1.5,0), 0x3f9e4e, 3.9],
   ]),
+  tall : ()=> mergePainted([          // tall canopy tree, lush forests
+    [new THREE.CylinderGeometry(0.22,0.35,4.2,5), 0x6b4a30, 2.1],
+    [new THREE.IcosahedronGeometry(1.5,0), 0x2f7e46, 4.9],
+    [new THREE.IcosahedronGeometry(1.0,0), 0x49a352, 6.2],
+  ]),
   spike: ()=> mergePainted([          // basalt spire, volcanic
     [new THREE.ConeGeometry(1.1,4.5,5), 0x241a18, 2.2],
     [new THREE.ConeGeometry(0.5,2.0,4), 0x552211, 4.6],
+  ]),
+  crystal: ()=> mergePainted([        // ice shards, glacial
+    [new THREE.OctahedronGeometry(0.8,0).scale(1,3.2,1), 0xbdf0ff, 1.8],
+    [new THREE.OctahedronGeometry(0.5,0).scale(1,2.4,1).translate(0.9,0,0.4), 0x8fd8f4, 1.0],
   ]),
   rock : (hex=0x6e6862)=> mergePainted([[new THREE.IcosahedronGeometry(1.4,0), hex, 0.6]]),
 };
@@ -713,6 +744,21 @@ function createPlanet(index, biomeKey, center){
   };
   p.atmoHeight = p.radius * 0.5;    // altitude where "space" begins
   p.group.position.copy(center);
+
+  /* volcanic worlds get real volcanoes: cone-with-crater bumps mixed into
+     the height field (see terrainRadius) + a glowing lava disc per caldera */
+  if(biomeKey==='VOLCANIC'){
+    p.features = [];
+    const n = 5 + ((prand()*3)|0);
+    for(let i=0;i<n;i++){
+      const z=prand()*2-1, a=prand()*Math.PI*2, r=Math.sqrt(1-z*z);
+      p.features.push({
+        dir: new THREE.Vector3(r*Math.cos(a), z, r*Math.sin(a)),
+        r: 0.10 + prand()*0.10,   // angular footprint (radians)
+        h: 130 + prand()*120,     // peak height above local terrain (m)
+      });
+    }
+  }
 
   // absolute sea-level radius, if the biome has an ocean
   p.waterR = p.biome.water!=null ? p.radius + (p.biome.water*2-1)*p.biome.amp : 0;
@@ -797,6 +843,25 @@ function createPlanet(index, biomeKey, center){
     const emis = pr.rocks==='lava' ? {emissive:0xff4400, emissiveIntensity:0.35} : {};
     scatterProps(p, PROP_GEOS.rock(rockHex), CONFIG.PROPS.rocks,
       { minScale:0.6, maxScale:2.6, ...emis });
+  }
+  // biome signatures: a second tree species on lush worlds, glowing ice
+  // shards on glacial worlds, molten calderas on volcanic worlds
+  if(biomeKey==='LUSH')
+    scatterProps(p, PROP_GEOS.tall(), 340, { minT:0.36, maxT:0.75, minScale:0.9, maxScale:1.7 });
+  if(biomeKey==='GLACIAL')
+    scatterProps(p, PROP_GEOS.crystal(), 90,
+      { minScale:0.7, maxScale:2.2, emissive:0x66d8ff, emissiveIntensity:0.35 });
+  if(p.features){
+    for(const f of p.features){
+      const lava = new THREE.Mesh(
+        new THREE.CylinderGeometry(f.r*p.radius*0.26, f.r*p.radius*0.26, 2, 10),
+        new THREE.MeshBasicMaterial({ color:0xff5a1e })
+      );
+      // a lava lake partway up the crater bowl, clipping into the walls
+      lava.position.copy(f.dir).multiplyScalar(terrainRadius(p, f.dir) + f.h*0.10);
+      lava.quaternion.setFromUnitVectors(UP, f.dir);
+      p.group.add(lava);
+    }
   }
 
   scene.add(p.group);
@@ -1000,7 +1065,14 @@ function initShip(){
 function updateShip(dt){
   const S = ship.def.stats;
 
-  // ---- steering: mouse = pitch/yaw, A/D = roll ----
+  // ---- steering: mouse OR arrow keys = pitch/yaw, A/D = roll ----
+  // arrows are folded into the mouse deltas (≈600 mouse-px per second),
+  // so each ship's TURN_SENS shapes both input methods the same way
+  const AP = 600*dt;
+  if(keys['ArrowLeft'])  mouseDX -= AP;
+  if(keys['ArrowRight']) mouseDX += AP;
+  if(keys['ArrowUp'])    mouseDY -= AP;  // up = nose up (matches mouse)
+  if(keys['ArrowDown'])  mouseDY += AP;
   const yaw   = -mouseDX * S.TURN_SENS;
   const pitch = -mouseDY * S.TURN_SENS;
   mouseDX = mouseDY = 0;
@@ -1102,6 +1174,13 @@ function updatePlayer(dt){
   const F = CONFIG.FOOT;
   const p = player.planet;
   const up = _v1.copy(player.pos).sub(p.center).normalize();
+
+  // arrow keys look around on foot too (same path as the mouse)
+  const AP = 500*dt;
+  if(keys['ArrowLeft'])  mouseDX -= AP;
+  if(keys['ArrowRight']) mouseDX += AP;
+  if(keys['ArrowUp'])    mouseDY -= AP;
+  if(keys['ArrowDown'])  mouseDY += AP;
 
   // --- keep the body frame aligned to local up, then apply mouse yaw ---
   _v2.copy(UP).applyQuaternion(player.quat);
@@ -1275,20 +1354,66 @@ function updateAtmosphereFX(near){
   scene.background.copy(_c2);
   scene.fog.color.copy(_c2);
 
-  const far = lerp(600000, 6000 + alt*4, f);  // fog closes in as we descend
-  scene.fog.near = far*0.12;
+  const far = lerp(600000, 9500 + alt*5, f);  // fog closes in as we descend
+  scene.fog.near = far*0.16;
   scene.fog.far  = far;
 
   // stars wash out in a bright daytime sky, linger through the night
   starPoints.material.opacity = clamp(1 - f*day*1.15, 0.05, 1);
   // fog-exempt glows must not punch through a thick atmosphere:
   sunGlow.material.opacity = 1 - f*0.85;
-  for(const q of planets) q.atmoMat.uniforms.uFade.value = q===p ? 1 : 1-f;
+  for(const q of planets){
+    // other planets' halos hide behind our haze; our own planet's rim glow
+    // is an orbit effect — inside the atmosphere it would wash the whole
+    // view with additive colour, so hand off to fog as we descend
+    q.atmoMat.uniforms.uFade.value = q===p ? 1 - f*0.85 : 1-f;
+    // fade the cloud shell out as the camera sinks below it — seen from
+    // underneath at grazing angles it would otherwise read as a white wall
+    if(q.clouds){
+      const camR = camera.position.distanceTo(q.center);
+      const above = clamp((camR - q.clouds.geometry.parameters.radius)/300, 0, 1);
+      q.clouds.material.opacity = q.biome.cloudOpacity * lerp(0.13, 1, smoothstep(above));
+    }
+  }
 }
 
 /* ==================================================================
    HUD
    ================================================================== */
+/* navigation markers: one label per planet so you can pick a
+   destination and see its biome + distance from anywhere */
+function initMarkers(){
+  const wrap = document.getElementById('markers');
+  for(const p of planets){
+    const el = document.createElement('div');
+    el.className = 'marker';
+    el.style.color = '#' + p.biome.atmo.toString(16).padStart(6,'0');
+    el.innerHTML = `<div class="dia">◇</div>${p.name.toUpperCase()}<br>`+
+      `${p.biomeKey} · <span class="md"></span>`;
+    el.style.display = 'none';
+    wrap.appendChild(el);
+    p.markerEl = el;
+    p.markerDist = el.querySelector('.md');
+  }
+}
+function updateMarkers(){
+  for(const p of planets){
+    const el = p.markerEl;
+    if(!el) continue;
+    _v1.copy(p.center).sub(camera.position);
+    const dist = _v1.length();
+    // only useful while flying, and hidden once you've arrived
+    if(mode!=='STARSHIP' || dist < p.radius*3.5){ el.style.display='none'; continue; }
+    _v2.copy(FWD).applyQuaternion(camera.quaternion);
+    if(_v1.dot(_v2) < 0){ el.style.display='none'; continue; } // behind us
+    _v3.copy(p.center).project(camera);
+    el.style.display = 'block';
+    el.style.left = ((_v3.x*0.5+0.5)*innerWidth)+'px';
+    el.style.top  = ((-_v3.y*0.5+0.5)*innerHeight)+'px';
+    p.markerDist.textContent = (dist/1000).toFixed(1)+' km';
+  }
+}
+
 const $ = id=>document.getElementById(id);
 const hudEls = {
   system:$('hud-system'), planet:$('hud-planet'), biome:$('hud-biome'), grav:$('hud-grav'),
@@ -1296,7 +1421,7 @@ const hudEls = {
   prompt:$('prompt'), reticle:$('reticle'),
 };
 const HINTS = {
-  STARSHIP:'MOUSE steer · W/S thrust · SPACE boost · A/D roll',
+  STARSHIP:'MOUSE/ARROWS steer · W/S thrust · SPACE boost · A/D roll',
   LANDING :'AUTOPILOT — TOUCHING DOWN',
   FOOT    :'WASD move · SPACE jump · SHIFT sprint · V camera',
 };
@@ -1367,6 +1492,7 @@ function tick(){
 
   updateAtmosphereFX(near);
   updateHUD(near, canLand, canBoard);
+  updateMarkers();
   composer.render();
 }
 
@@ -1399,7 +1525,7 @@ function pauseGame(){
 
 function initInput(){
   addEventListener('keydown', e=>{
-    if(e.code==='Space') e.preventDefault();
+    if(e.code==='Space' || e.code.startsWith('Arrow')) e.preventDefault();
     if(e.code==='Escape' && usingFallback) pauseGame(); // no lock = no browser Esc handling
     if(keys[e.code]) return;
     keys[e.code]=true;
@@ -1466,6 +1592,7 @@ function boot(){
   initSky();
   initUniverse();
   initShipCards();
+  initMarkers();
   initShip();
   initPlayer();
   initInput();
@@ -1486,7 +1613,7 @@ function boot(){
 setTimeout(()=>{
   boot();
   // console handle for live tweaking: STARFALL.planets, STARFALL.ship, …
-  window.STARFALL = { CONFIG, BIOMES, SHIPS, planets, ship, player, seed:SEED,
+  window.STARFALL = { CONFIG, BIOMES, SHIPS, planets, ship, player, camera, seed:SEED,
     terrainRadius, selectShip, get mode(){ return mode; } };
 }, 60);
 </script>
