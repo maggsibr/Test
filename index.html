@@ -109,6 +109,8 @@
     animation:pulse 1.6s ease-in-out infinite;
   }
   #overlay .tiny{margin-top:26px;font-size:11px;color:rgba(160,200,230,.4);letter-spacing:.15em;}
+  #touch-note{margin-top:18px;font-size:12px;color:#ffb86b;letter-spacing:.15em;display:none;}
+  body.nocursor{cursor:none;}
 </style>
 </head>
 <body>
@@ -148,8 +150,27 @@
     <tr><td class="k">V</td><td>toggle camera (on foot)</td></tr>
   </table>
   <div class="go" id="go-label">GENERATING UNIVERSE…</div>
+  <div id="touch-note">TOUCH DEVICE DETECTED — THIS GAME NEEDS A KEYBOARD &amp; MOUSE</div>
   <div class="tiny" id="seed-label"></div>
 </div>
+
+<!-- Watchdog: if the module script never booted (CDN unreachable, JS error),
+     say so on the title screen instead of failing silently. -->
+<script>
+  addEventListener('error', function(e){
+    if(!window.STARFALL){
+      var g = document.getElementById('go-label');
+      if(g) g.textContent = 'ERROR — ' + (e.message || 'failed to start');
+    }
+  });
+  setTimeout(function(){
+    if(!window.STARFALL){
+      var g = document.getElementById('go-label');
+      if(g && g.textContent.indexOf('ERROR') < 0)
+        g.textContent = 'LOAD ERROR — CHECK CONNECTION (three.js CDN)';
+    }
+  }, 12000);
+</script>
 
 <!-- Three.js via CDN — no build step. Bump the version here if you like. -->
 <script type="importmap">
@@ -1220,9 +1241,33 @@ function tick(){
    INPUT + BOOT
    ================================================================== */
 const overlay = document.getElementById('overlay');
+// Pointer lock is preferred, but some browsers/devices deny or lack it —
+// then we run "unlocked" and read mouse deltas straight off mousemove.
+let usingFallback = false;
+
+function startGame(){
+  if(!paused) return;
+  paused = false;
+  overlay.style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  for(const k in keys) keys[k]=false;
+  mouseDX = mouseDY = 0;
+  clock.getDelta(); // swallow the paused time so dt doesn't spike
+}
+function pauseGame(){
+  if(paused) return;
+  paused = true;
+  document.body.classList.remove('nocursor');
+  overlay.style.display = 'flex';
+  document.getElementById('go-label').textContent = 'CLICK TO RESUME';
+  for(const k in keys) keys[k]=false;
+  mouseDX = mouseDY = 0;
+}
+
 function initInput(){
   addEventListener('keydown', e=>{
     if(e.code==='Space') e.preventDefault();
+    if(e.code==='Escape' && usingFallback) pauseGame(); // no lock = no browser Esc handling
     if(keys[e.code]) return;
     keys[e.code]=true;
     if(paused) return;
@@ -1232,22 +1277,32 @@ function initInput(){
   addEventListener('keyup', e=>{ keys[e.code]=false; });
 
   addEventListener('mousemove', e=>{
-    if(document.pointerLockElement!==renderer.domElement) return;
-    mouseDX += e.movementX; mouseDY += e.movementY;
+    const locked = document.pointerLockElement===renderer.domElement;
+    if(paused || (!locked && !usingFallback)) return;
+    mouseDX += e.movementX||0; mouseDY += e.movementY||0;
   });
 
-  overlay.addEventListener('click', ()=>{ renderer.domElement.requestPointerLock(); });
+  overlay.addEventListener('click', ()=>{
+    if(!window.STARFALL) return; // not booted yet
+    let req = null;
+    try{ req = renderer.domElement.requestPointerLock(); }catch(err){ /* fall back below */ }
+    if(req && typeof req.catch==='function') req.catch(()=>{});
+    // if the lock didn't engage (denied / unsupported), start without it
+    setTimeout(()=>{
+      if(paused && document.pointerLockElement!==renderer.domElement){
+        usingFallback = true;
+        document.body.classList.add('nocursor');
+        startGame();
+      }
+    }, 350);
+  });
+
   document.addEventListener('pointerlockchange', ()=>{
-    const locked = document.pointerLockElement===renderer.domElement;
-    paused = !locked;
-    overlay.style.display = locked ? 'none' : 'flex';
-    document.getElementById('hud').style.display = 'block';
-    if(!locked){
-      document.getElementById('go-label').textContent = 'CLICK TO RESUME';
-      for(const k in keys) keys[k]=false;
-      mouseDX = mouseDY = 0;
-    } else {
-      clock.getDelta(); // swallow the paused time so dt doesn't spike
+    if(document.pointerLockElement===renderer.domElement){
+      usingFallback = false;
+      startGame();
+    } else if(!usingFallback){
+      pauseGame(); // user pressed Esc while locked
     }
   });
 }
@@ -1260,6 +1315,8 @@ function boot(){
   initPlayer();
   initInput();
   document.getElementById('go-label').textContent = 'CLICK TO BEGIN';
+  if(matchMedia('(pointer:coarse)').matches && !matchMedia('(pointer:fine)').matches)
+    document.getElementById('touch-note').style.display = 'block';
   document.getElementById('seed-label').textContent =
     'SEED '+SEED+' — append ?seed='+SEED+' to the URL to revisit this universe';
   // pre-position the camera behind the ship for the title backdrop
