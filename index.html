@@ -99,8 +99,28 @@
     text-shadow:0 0 24px rgba(127,223,255,.8);margin-bottom:6px;
     padding-left:.45em; /* visually recentre the letter-spaced title */
   }
-  #overlay .sub{letter-spacing:.3em;color:rgba(160,200,230,.6);font-size:13px;margin-bottom:38px;}
-  #overlay table{border-collapse:collapse;margin-bottom:38px;}
+  #overlay .sub{letter-spacing:.3em;color:rgba(160,200,230,.6);font-size:13px;margin-bottom:28px;}
+  #overlay table{border-collapse:collapse;margin-bottom:24px;}
+
+  /* ---------- ship selector ---------- */
+  #ship-label{font-size:11px;letter-spacing:.3em;color:rgba(160,200,230,.55);margin-bottom:10px;}
+  #ship-row{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;justify-content:center;}
+  .ship-card{
+    background:var(--panel);border:1px solid var(--accent-dim);border-radius:3px;
+    padding:10px 14px;min-width:158px;text-align:left;cursor:pointer;
+    transition:border-color .15s, background .15s, box-shadow .15s;
+  }
+  .ship-card:hover{border-color:var(--accent);}
+  .ship-card.sel{
+    border-color:var(--accent);background:rgba(127,223,255,.1);
+    box-shadow:0 0 14px rgba(127,223,255,.3);
+  }
+  .ship-card .sname{color:var(--accent);font-size:14px;letter-spacing:.15em;}
+  .ship-card .sclass{font-size:9px;color:rgba(160,200,230,.55);letter-spacing:.12em;margin-bottom:8px;}
+  .ship-card .srow{display:flex;align-items:center;gap:7px;font-size:9px;
+    color:rgba(160,200,230,.6);letter-spacing:.1em;margin-top:3px;}
+  .ship-card .bar{flex:1;height:4px;background:rgba(127,223,255,.12);border-radius:2px;overflow:hidden;}
+  .ship-card .bar i{display:block;height:100%;background:var(--accent);}
   #overlay td{padding:4px 16px;font-size:13px;letter-spacing:.1em;text-align:left;}
   #overlay td.k{color:var(--accent);text-align:right;}
   #overlay .go{
@@ -149,6 +169,8 @@
     <tr><td class="k">F</td><td>land / exit / board ship</td></tr>
     <tr><td class="k">V</td><td>toggle camera (on foot)</td></tr>
   </table>
+  <div id="ship-label">// SELECT YOUR SHIP — SWITCH ANY TIME FROM THIS SCREEN //</div>
+  <div id="ship-row"></div>
   <div class="go" id="go-label">GENERATING UNIVERSE…</div>
   <div id="touch-note">TOUCH DEVICE DETECTED — THIS GAME NEEDS A KEYBOARD &amp; MOUSE</div>
   <div class="tiny" id="seed-label"></div>
@@ -198,15 +220,6 @@ const CONFIG = {
   SYSTEM_RADIUS: 26000,      // planets sit between ~7000 m and this distance from the sun
   PLANET_RADIUS: [750, 1400],// min / max planet radius (m)
 
-  SHIP: {
-    MAX_SPEED   : 320,       // cruise top speed, m/s
-    BOOST_MULT  : 3.2,       // boost multiplier (hold Space)
-    ATMO_CAP    : 420,       // speed cap while inside an atmosphere
-    TURN_SENS   : 0.0021,    // mouse steering sensitivity
-    ROLL_SPEED  : 1.9,       // A/D roll rate, rad/s
-    CAM_OFFSET  : [0, 3.4, 11.5], // chase camera offset in ship-local space
-  },
-
   FOOT: {
     WALK_SPEED  : 6.0,       // m/s
     SPRINT_MULT : 1.9,
@@ -223,6 +236,33 @@ const CONFIG = {
   STARS  : 9000,                        // starfield point count
   PROPS  : { trees: 240, rocks: 150 },  // scattered per planet (biome permitting)
 };
+
+/* ------------------------------------------------------------------
+   SHIPS — the flyable roster, slowest to fastest. Pick one on the
+   title screen (or pause with Esc mid-game and switch).
+   MAX_SPEED  : cruise top speed, m/s
+   BOOST_MULT : boost multiplier while holding Space
+   ATMO_CAP   : speed cap inside an atmosphere
+   TURN_SENS  : mouse steering sensitivity (higher = twitchier)
+   ROLL_SPEED : A/D roll rate, rad/s
+   ACCEL      : how quickly speed chases the throttle
+   camOffset  : chase camera offset in ship-local space
+   Add a ship: push an entry here + a build function (see buildStarfall).
+   ------------------------------------------------------------------ */
+const SHIPS = [
+  { name:'WAYFARER', cls:'HAULER', desc:'steady freighter', glow:0xffb35c,
+    stats:{ MAX_SPEED:260, BOOST_MULT:2.6, ATMO_CAP:340, TURN_SENS:0.0015, ROLL_SPEED:1.3, ACCEL:1.5 },
+    camOffset:[0, 4.4, 14], build:()=>buildWayfarer() },
+  { name:'STARFALL', cls:'EXPLORER', desc:'balanced all-rounder', glow:0x6fd8ff,
+    stats:{ MAX_SPEED:320, BOOST_MULT:3.2, ATMO_CAP:420, TURN_SENS:0.0021, ROLL_SPEED:1.9, ACCEL:2.2 },
+    camOffset:[0, 3.4, 11.5], build:()=>buildStarfall() },
+  { name:'VIPER', cls:'FIGHTER', desc:'fast & agile', glow:0xff8844,
+    stats:{ MAX_SPEED:400, BOOST_MULT:3.6, ATMO_CAP:500, TURN_SENS:0.0028, ROLL_SPEED:2.6, ACCEL:3.0 },
+    camOffset:[0, 3.2, 11], build:()=>buildViper() },
+  { name:'PHANTOM', cls:'INTERCEPTOR', desc:'blistering, twitchy', glow:0xb07fff,
+    stats:{ MAX_SPEED:480, BOOST_MULT:4.2, ATMO_CAP:560, TURN_SENS:0.0034, ROLL_SPEED:3.2, ACCEL:3.6 },
+    camOffset:[0, 3.0, 11.5], build:()=>buildPhantom() },
+];
 
 /* ------------------------------------------------------------------
    BIOMES — everything here is safe to play with.
@@ -806,42 +846,130 @@ function nearestPlanet(pos){
 /* ==================================================================
    THE SHIP — low-poly hero model + arcade flight
    ================================================================== */
-function buildShipMesh(){
-  const grp = new THREE.Group();
-  const hull  = new THREE.MeshStandardMaterial({ color:0xaab4c4, flatShading:true, metalness:0.65, roughness:0.35 });
-  const dark  = new THREE.MeshStandardMaterial({ color:0x2a3140, flatShading:true, metalness:0.5, roughness:0.5 });
+/* ---------- shared ship-building helpers ---------- */
+function shipMats(hullHex, darkHex, glowHex){
+  return {
+    hull: new THREE.MeshStandardMaterial({ color:hullHex, flatShading:true, metalness:0.65, roughness:0.35 }),
+    dark: new THREE.MeshStandardMaterial({ color:darkHex, flatShading:true, metalness:0.5, roughness:0.5 }),
+    canopy: new THREE.MeshStandardMaterial({ color:0x1a3a4a, emissive:glowHex, emissiveIntensity:0.55, roughness:0.15, metalness:0.6 }),
+    glow: glowHex,
+  };
+}
+function addEngine(grp, m, x, y, z, r){
+  const e = new THREE.Mesh(new THREE.CylinderGeometry(r*0.82, r, r*2.6, 6), m.dark);
+  e.rotation.x = -Math.PI/2; e.position.set(x,y,z); grp.add(e);
+  const f = new THREE.Mesh(new THREE.ConeGeometry(r*0.7, 1.8, 8),
+    new THREE.MeshBasicMaterial({ color:m.glow, transparent:true, opacity:0.9 }));
+  f.rotation.x = Math.PI/2; f.position.set(x,y,z+r*2.2); grp.add(f);
+  grp.engFlame.push(f);
+}
+function addCanopy(grp, m, y, z, len=1.6){
+  const c = new THREE.Mesh(new THREE.SphereGeometry(0.72,10,8), m.canopy);
+  c.scale.set(1,0.62,len); c.position.set(0,y,z); grp.add(c);
+}
 
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.35,6.4,6), hull);
-  body.rotation.x = -Math.PI/2; grp.add(body);
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.92,2.6,6), hull);
-  nose.rotation.x = -Math.PI/2; nose.position.z = -4.4; grp.add(nose);
-
-  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.72,10,8),
-    new THREE.MeshStandardMaterial({ color:0x1a3a4a, emissive:0x4fc8ef, emissiveIntensity:0.55, roughness:0.15, metalness:0.6 }));
-  canopy.scale.set(1,0.62,1.6); canopy.position.set(0,0.75,-1.4); grp.add(canopy);
-
-  const wingGeo = new THREE.BoxGeometry(4.4,0.16,2.2);
-  const wl = new THREE.Mesh(wingGeo, dark); wl.position.set(-2.8,-0.15,1.4); wl.rotation.set(0,0.28,0.1);  grp.add(wl);
-  const wr = new THREE.Mesh(wingGeo, dark); wr.position.set( 2.8,-0.15,1.4); wr.rotation.set(0,-0.28,-0.1); grp.add(wr);
-  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.14,1.5,1.6), dark);
-  fin.position.set(0,0.95,2.4); grp.add(fin);
-
-  const engGeo = new THREE.CylinderGeometry(0.5,0.62,1.6,6);
-  grp.engFlame = [];
+/* WAYFARER — boxy hauler: slow, stable, amber engines */
+function buildWayfarer(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0xb0a494, 0x3a3630, 0xffb35c);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.2,2.0,7.2), m.hull); grp.add(body);
+  const cab  = new THREE.Mesh(new THREE.BoxGeometry(2.0,1.1,1.8), m.dark);
+  cab.position.set(0,1.35,-2.2); grp.add(cab);
+  addCanopy(grp, m, 1.6, -2.6, 1.1);
   for(const sx of [-1,1]){
-    const e = new THREE.Mesh(engGeo, dark);
-    e.rotation.x = -Math.PI/2; e.position.set(sx*1.5,-0.1,2.9); grp.add(e);
-    const f = new THREE.Mesh(new THREE.ConeGeometry(0.42,1.8,8),
-      new THREE.MeshBasicMaterial({ color:0x6fd8ff, transparent:true, opacity:0.9 }));
-    f.rotation.x = Math.PI/2; f.position.set(sx*1.5,-0.1,4.2); grp.add(f);
-    grp.engFlame.push(f);
+    const pod = new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,4.6), m.dark);
+    pod.position.set(sx*2.1,-0.4,0.6); grp.add(pod);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.16,2.6), m.hull);
+    wing.position.set(sx*3.2,0.2,1.2); grp.add(wing);
+    addEngine(grp, m, sx*1.2,  0.55, 3.8, 0.55);
+    addEngine(grp, m, sx*1.2, -0.55, 3.8, 0.55);
   }
   return grp;
 }
 
+/* STARFALL — the original explorer: balanced, cyan engines */
+function buildStarfall(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0xaab4c4, 0x2a3140, 0x6fd8ff);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.35,6.4,6), m.hull);
+  body.rotation.x = -Math.PI/2; grp.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.92,2.6,6), m.hull);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -4.4; grp.add(nose);
+  addCanopy(grp, m, 0.75, -1.4);
+  const wingGeo = new THREE.BoxGeometry(4.4,0.16,2.2);
+  const wl = new THREE.Mesh(wingGeo, m.dark); wl.position.set(-2.8,-0.15,1.4); wl.rotation.set(0,0.28,0.1);  grp.add(wl);
+  const wr = new THREE.Mesh(wingGeo, m.dark); wr.position.set( 2.8,-0.15,1.4); wr.rotation.set(0,-0.28,-0.1); grp.add(wr);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.14,1.5,1.6), m.dark);
+  fin.position.set(0,0.95,2.4); grp.add(fin);
+  addEngine(grp, m, -1.5,-0.1, 3.1, 0.56);
+  addEngine(grp, m,  1.5,-0.1, 3.1, 0.56);
+  return grp;
+}
+
+/* VIPER — swept-wing fighter: quick, orange afterburners */
+function buildViper(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0xc4b4b8, 0x4a1e26, 0xff8844);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.65,1.05,6.0,6), m.hull);
+  body.rotation.x = -Math.PI/2; grp.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.68,3.2,6), m.hull);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -4.6; grp.add(nose);
+  addCanopy(grp, m, 0.6, -1.6, 1.8);
+  const wingGeo = new THREE.BoxGeometry(5.6,0.12,1.7);
+  const wl = new THREE.Mesh(wingGeo, m.dark); wl.position.set(-3.0,0,1.8); wl.rotation.set(0, 0.55, 0.05); grp.add(wl);
+  const wr = new THREE.Mesh(wingGeo, m.dark); wr.position.set( 3.0,0,1.8); wr.rotation.set(0,-0.55,-0.05); grp.add(wr);
+  for(const sx of [-1,1]){
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12,1.6,1.4), m.dark);
+    fin.position.set(sx*0.7,1.0,2.6); fin.rotation.z = sx*-0.5; grp.add(fin);
+  }
+  addEngine(grp, m, -0.85,0, 3.1, 0.5);
+  addEngine(grp, m,  0.85,0, 3.1, 0.5);
+  return grp;
+}
+
+/* PHANTOM — needle interceptor: fastest, violet drive */
+function buildPhantom(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0x50556a, 0x23242e, 0xb07fff);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.85,7.4,6), m.hull);
+  body.rotation.x = -Math.PI/2; grp.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.47,3.6,6), m.hull);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -5.5; grp.add(nose);
+  addCanopy(grp, m, 0.45, -2.2, 2.2);
+  for(const sx of [-1,1]){
+    const canard = new THREE.Mesh(new THREE.BoxGeometry(1.8,0.1,0.9), m.dark);
+    canard.position.set(sx*1.0,0,-2.6); canard.rotation.set(0,sx*-0.3,sx*-0.15); grp.add(canard);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(3.4,0.12,1.9), m.dark);
+    blade.position.set(sx*1.8,-0.5,2.2); blade.rotation.set(0,sx*-0.4,sx*0.55); grp.add(blade);
+  }
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12,1.8,1.8), m.dark);
+  fin.position.set(0,0.9,3.0); grp.add(fin);
+  addEngine(grp, m, 0, 0, 3.9, 0.75);
+  return grp;
+}
+
+/* swap the flown ship (works any time — pause with Esc and pick another) */
+function selectShip(i){
+  const def = SHIPS[i];
+  const mesh = def.build();
+  if(ship.mesh){
+    mesh.position.copy(ship.mesh.position);
+    mesh.quaternion.copy(ship.mesh.quaternion);
+    scene.remove(ship.mesh);
+  }
+  ship.def = def;
+  ship.index = i;
+  ship.mesh = mesh;
+  ship.engineLight.color.setHex(def.glow);
+  ship.mesh.add(ship.engineLight);   // re-parents the light onto the new hull
+  scene.add(ship.mesh);
+  try{ localStorage.setItem('starfall-ship', i); }catch(e){}
+  document.querySelectorAll('.ship-card').forEach((c,ci)=>c.classList.toggle('sel', ci===i));
+}
+
 function initShip(){
   ship = {
-    mesh: buildShipMesh(),
+    mesh: null, def: null, index: 1,
     pos: new THREE.Vector3(),
     quat: new THREE.Quaternion(),
     speed: 0,
@@ -849,9 +977,13 @@ function initShip(){
     bank: 0,
     engineLight: new THREE.PointLight(0x66ccff, 0, 60, 2),
   };
-  ship.mesh.add(ship.engineLight);
   ship.engineLight.position.set(0,0,4);
-  scene.add(ship.mesh);
+  let start = 1; // default to the STARFALL explorer
+  try{
+    const saved = parseInt(localStorage.getItem('starfall-ship'),10);
+    if(Number.isFinite(saved)) start = clamp(saved, 0, SHIPS.length-1);
+  }catch(e){}
+  selectShip(start);
 
   // start in orbit above the first planet's SUNLIT side, nose pointed at it
   const p0 = planets[0];
@@ -866,7 +998,7 @@ function initShip(){
 }
 
 function updateShip(dt){
-  const S = CONFIG.SHIP;
+  const S = ship.def.stats;
 
   // ---- steering: mouse = pitch/yaw, A/D = roll ----
   const yaw   = -mouseDX * S.TURN_SENS;
@@ -889,7 +1021,7 @@ function updateShip(dt){
   const inAtmo = near.alt < near.planet.atmoHeight;
   let target = ship.throttle * S.MAX_SPEED * (boosting ? S.BOOST_MULT : 1);
   if(inAtmo) target = clamp(target, -S.ATMO_CAP*0.2, S.ATMO_CAP);
-  ship.speed = lerp(ship.speed, target, 1-Math.exp(-2.2*dt));
+  ship.speed = lerp(ship.speed, target, 1-Math.exp(-S.ACCEL*dt));
 
   // ---- integrate ----
   _v1.copy(FWD).applyQuaternion(ship.quat);
@@ -920,7 +1052,7 @@ function updateShip(dt){
   ship.engineLight.intensity = thrust * (boosting?26:12);
 
   // ---- chase camera target ----
-  _v3.fromArray(S.CAM_OFFSET).applyQuaternion(ship.quat);
+  _v3.fromArray(ship.def.camOffset).applyQuaternion(ship.quat);
   camTargetPos.copy(ship.pos).add(_v3);
   _v1.copy(FWD).applyQuaternion(ship.quat);
   _v2.copy(ship.pos).addScaledVector(_v1, 30);
@@ -1098,7 +1230,7 @@ function updateLanding(dt){
   ship.engineLight.intensity *= 0.95;
 
   // camera keeps chasing during the descent
-  _v3.fromArray(CONFIG.SHIP.CAM_OFFSET).applyQuaternion(ship.quat);
+  _v3.fromArray(ship.def.camOffset).applyQuaternion(ship.quat);
   camTargetPos.copy(ship.pos).add(_v3);
   _v2.copy(UP).applyQuaternion(ship.quat);
   _m1.lookAt(camTargetPos, ship.pos, _v2);
@@ -1179,7 +1311,8 @@ function updateHUD(near, canLand, canBoard){
   hudEls.speed.textContent = Math.round(spd);
   hudEls.alt.textContent   = Math.max(0,Math.round(near.alt)).toLocaleString('en-US');
 
-  hudEls.mode.textContent  = mode==='FOOT' ? 'ON FOOT' : mode==='LANDING' ? 'LANDING' : 'STARSHIP';
+  hudEls.mode.textContent  = mode==='FOOT' ? 'ON FOOT' : mode==='LANDING' ? 'LANDING'
+    : 'STARSHIP · ' + ship.def.name;
   hudEls.hints.textContent = HINTS[mode]||'';
   hudEls.reticle.style.display = mode==='STARSHIP' ? 'block' : 'none';
 
@@ -1307,10 +1440,32 @@ function initInput(){
   });
 }
 
+/* build the clickable ship cards on the overlay */
+function initShipCards(){
+  const maxSpd = Math.max(...SHIPS.map(s=>s.stats.MAX_SPEED*s.stats.BOOST_MULT));
+  const maxAgi = Math.max(...SHIPS.map(s=>s.stats.TURN_SENS));
+  const row = document.getElementById('ship-row');
+  const barRow = (label, frac)=>
+    `<div class="srow"><span>${label}</span><div class="bar"><i style="width:${Math.round(frac*100)}%"></i></div></div>`;
+  SHIPS.forEach((s,i)=>{
+    const card = document.createElement('div');
+    card.className = 'ship-card';
+    card.innerHTML =
+      `<div class="sname">${s.name}</div>`+
+      `<div class="sclass">${s.cls} — ${s.desc}</div>`+
+      barRow('SPD', (s.stats.MAX_SPEED*s.stats.BOOST_MULT)/maxSpd)+
+      barRow('AGI', s.stats.TURN_SENS/maxAgi);
+    // stopPropagation so picking a ship doesn't also trigger click-to-begin
+    card.addEventListener('click', e=>{ e.stopPropagation(); selectShip(i); });
+    row.appendChild(card);
+  });
+}
+
 function boot(){
   initRenderer();
   initSky();
   initUniverse();
+  initShipCards();
   initShip();
   initPlayer();
   initInput();
@@ -1320,7 +1475,7 @@ function boot(){
   document.getElementById('seed-label').textContent =
     'SEED '+SEED+' — append ?seed='+SEED+' to the URL to revisit this universe';
   // pre-position the camera behind the ship for the title backdrop
-  _v3.fromArray(CONFIG.SHIP.CAM_OFFSET).applyQuaternion(ship.quat);
+  _v3.fromArray(ship.def.camOffset).applyQuaternion(ship.quat);
   camera.position.copy(ship.pos).add(_v3);
   camera.lookAt(planets[0].center);
   tick();
@@ -1331,8 +1486,8 @@ function boot(){
 setTimeout(()=>{
   boot();
   // console handle for live tweaking: STARFALL.planets, STARFALL.ship, …
-  window.STARFALL = { CONFIG, BIOMES, planets, ship, player, seed:SEED,
-    terrainRadius, get mode(){ return mode; } };
+  window.STARFALL = { CONFIG, BIOMES, SHIPS, planets, ship, player, seed:SEED,
+    terrainRadius, selectShip, get mode(){ return mode; } };
 }, 60);
 </script>
 </body>
