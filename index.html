@@ -2,917 +2,1660 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-<meta name="theme-color" content="#0a0e1a" />
-<title>Gravity Stack</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>STARFALL // EXPLORER</title>
 <style>
+  /* ============================================================
+     STARFALL // EXPLORER — a tiny No Man's Sky-like in one file
+     HUD + overlay styling. Sci-fi monospace, semi-transparent
+     panels, subtle glow. Tweak the accent colour below.
+     ============================================================ */
   :root{
-    --bg0:#070a14; --bg1:#0d1326; --accent:#5ee7ff; --accent2:#b388ff;
-    --good:#5dffa0; --danger:#ff4d6d; --text:#eaf2ff; --muted:#8fa3c8;
+    --accent:#7fdfff;
+    --accent-dim:rgba(127,223,255,.35);
+    --panel:rgba(6,14,22,.55);
+    --text:#cfe8ff;
   }
-  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;overflow:hidden;background:var(--bg0);}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:#000;}
   body{
-    font-family:"Segoe UI",system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
-    color:var(--text); user-select:none; -webkit-user-select:none; touch-action:none;
-    position:fixed; inset:0;
+    font-family:"Courier New","Lucida Console",monospace;
+    color:var(--text);
+    user-select:none;-webkit-user-select:none;
   }
-  #stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;}
-  canvas{display:block;position:absolute;inset:0;width:100%;height:100%;}
+  canvas{display:block;}
 
   /* ---------- HUD ---------- */
-  #hud{position:absolute;inset:0;pointer-events:none;z-index:5;}
-  .hud-top{
-    position:absolute;top:0;left:0;right:0;
-    display:flex;justify-content:space-between;align-items:flex-start;
-    padding:14px 16px;gap:10px;
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;display:none;}
+  .panel{
+    position:absolute;
+    background:var(--panel);
+    border:1px solid var(--accent-dim);
+    border-radius:4px;
+    padding:10px 14px;
+    font-size:13px;
+    line-height:1.55;
+    letter-spacing:.08em;
+    text-shadow:0 0 6px rgba(127,223,255,.45);
+    backdrop-filter:blur(3px);
+    -webkit-backdrop-filter:blur(3px);
   }
-  .stat{
-    background:rgba(12,18,38,.55);backdrop-filter:blur(8px);
-    border:1px solid rgba(120,160,255,.18);border-radius:14px;
-    padding:8px 14px;min-width:84px;box-shadow:0 6px 24px rgba(0,0,0,.35);
-  }
-  .stat .label{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);}
-  .stat .value{font-size:22px;font-weight:700;line-height:1.1;
-    background:linear-gradient(180deg,#fff,#add6ff);-webkit-background-clip:text;background-clip:text;color:transparent;}
-  .stat .value.small{font-size:15px;}
-  #nextWrap{display:flex;flex-direction:column;align-items:center;gap:4px;}
-  #nextCanvas{width:64px;height:64px;background:rgba(12,18,38,.55);border:1px solid rgba(120,160,255,.18);
-    border-radius:14px;box-shadow:0 6px 24px rgba(0,0,0,.35);}
+  .panel .lbl{color:rgba(160,200,230,.55);}
+  .panel .big{font-size:17px;color:var(--accent);}
+  #panel-loc{top:18px;left:18px;min-width:270px;}
+  #panel-nav{bottom:18px;left:18px;min-width:200px;}
+  #panel-nav .val{font-size:20px;color:var(--accent);}
+  #panel-mode{bottom:18px;right:18px;text-align:right;min-width:230px;}
+  #panel-mode .mode{font-size:16px;color:var(--accent);}
+  #panel-mode .hints{font-size:11px;color:rgba(160,200,230,.65);margin-top:4px;}
 
-  .hud-bottom{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;
-    gap:12px;padding:18px;pointer-events:none;}
-  .btn{
-    pointer-events:auto;cursor:pointer;border:none;outline:none;
-    font-family:inherit;font-weight:700;letter-spacing:.04em;color:#04121f;
-    background:linear-gradient(180deg,var(--accent),#39b9d6);
-    border-radius:16px;padding:14px 30px;font-size:18px;
-    box-shadow:0 8px 30px rgba(94,231,255,.35),inset 0 1px 0 rgba(255,255,255,.5);
-    transition:transform .08s ease,filter .15s ease;
+  /* corner ticks give panels a sci-fi frame feel */
+  .panel::before,.panel::after{
+    content:"";position:absolute;width:10px;height:10px;
+    border:1px solid var(--accent);opacity:.8;
   }
-  .btn:active{transform:translateY(2px) scale(.98);filter:brightness(1.08);}
-  .btn.ghost{background:rgba(20,28,52,.7);color:var(--text);border:1px solid rgba(120,160,255,.25);
-    box-shadow:0 6px 20px rgba(0,0,0,.35);font-size:15px;padding:12px 20px;}
-  .iconbtn{
-    pointer-events:auto;cursor:pointer;width:42px;height:42px;border-radius:12px;
-    background:rgba(12,18,38,.55);border:1px solid rgba(120,160,255,.2);
-    color:var(--text);font-size:18px;display:flex;align-items:center;justify-content:center;
-    backdrop-filter:blur(8px);
+  .panel::before{top:-1px;left:-1px;border-right:none;border-bottom:none;}
+  .panel::after{bottom:-1px;right:-1px;border-left:none;border-top:none;}
+
+  /* interaction prompt (LAND / BOARD) */
+  #prompt{
+    position:absolute;bottom:110px;left:50%;transform:translateX(-50%);
+    font-size:15px;letter-spacing:.25em;color:var(--accent);
+    background:var(--panel);border:1px solid var(--accent-dim);
+    padding:8px 22px;border-radius:3px;
+    animation:pulse 1.4s ease-in-out infinite;display:none;
+    text-shadow:0 0 10px rgba(127,223,255,.8);
+  }
+  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+
+  /* flight crosshair */
+  #reticle{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    width:26px;height:26px;opacity:.75;
+  }
+  #reticle::before,#reticle::after{
+    content:"";position:absolute;background:var(--accent);
+    box-shadow:0 0 4px rgba(127,223,255,.9);
+  }
+  #reticle::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-.5px);}
+  #reticle::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-.5px);}
+
+  /* planet navigation markers (projected over each planet in flight) */
+  .marker{
+    position:absolute;transform:translate(-50%,-50%);pointer-events:none;
+    text-align:center;font-size:10px;letter-spacing:.12em;line-height:1.5;
+    text-shadow:0 0 8px rgba(0,0,0,.9);white-space:nowrap;opacity:.85;
+  }
+  .marker .dia{font-size:13px;}
+
+  /* cinematic vignette */
+  #vignette{
+    position:fixed;inset:0;pointer-events:none;z-index:5;
+    background:radial-gradient(ellipse at center,
+      transparent 55%,rgba(0,0,5,.5) 100%);
   }
 
-  /* ---------- popups ---------- */
-  #popups{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden;}
-  .popup{position:absolute;left:50%;top:40%;transform:translate(-50%,-50%);
-    font-weight:800;font-size:26px;text-shadow:0 2px 18px rgba(0,0,0,.6);
-    color:var(--good);white-space:nowrap;animation:floatUp 1.6s ease-out forwards;}
-  @keyframes floatUp{
-    0%{opacity:0;transform:translate(-50%,-50%) scale(.6);}
-    18%{opacity:1;transform:translate(-50%,-58%) scale(1.08);}
-    100%{opacity:0;transform:translate(-50%,-130%) scale(1);}
+  /* ---------- start / pause overlay ---------- */
+  #overlay{
+    position:fixed;inset:0;z-index:20;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at center,rgba(4,10,20,.82),rgba(0,0,4,.95));
+    cursor:pointer;text-align:center;
   }
+  #overlay h1{
+    font-size:42px;letter-spacing:.45em;color:var(--accent);font-weight:normal;
+    text-shadow:0 0 24px rgba(127,223,255,.8);margin-bottom:6px;
+    padding-left:.45em; /* visually recentre the letter-spaced title */
+  }
+  #overlay .sub{letter-spacing:.3em;color:rgba(160,200,230,.6);font-size:13px;margin-bottom:28px;}
+  #overlay table{border-collapse:collapse;margin-bottom:24px;}
 
-  /* ---------- overlays (start / gameover) ---------- */
-  .overlay{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;text-align:center;padding:24px;gap:18px;
-    background:radial-gradient(120% 90% at 50% 10%,rgba(30,40,80,.55),rgba(5,8,20,.92));
-    backdrop-filter:blur(6px);}
-  .overlay.hidden{display:none;}
-  .title{font-size:clamp(44px,13vw,92px);font-weight:900;letter-spacing:-.02em;line-height:.92;
-    background:linear-gradient(180deg,#eafcff 0%,var(--accent) 45%,var(--accent2) 100%);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
-    filter:drop-shadow(0 8px 40px rgba(94,231,255,.35));}
-  .subtitle{color:var(--muted);font-size:14px;letter-spacing:.32em;text-transform:uppercase;margin-top:-6px;}
-  .card{max-width:420px;background:rgba(12,18,38,.5);border:1px solid rgba(120,160,255,.18);
-    border-radius:18px;padding:18px 22px;box-shadow:0 14px 50px rgba(0,0,0,.45);}
-  .card h3{font-size:13px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:10px;}
-  .how{display:flex;flex-direction:column;gap:9px;text-align:left;font-size:14px;color:#cdd9f5;line-height:1.45;}
-  .how b{color:#fff;}
-  .best{font-size:15px;color:var(--muted);}
-  .best b{color:var(--good);font-size:20px;}
-  .row{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;}
-  .go-stats{display:flex;gap:26px;justify-content:center;margin:4px 0;}
-  .go-stat .v{font-size:38px;font-weight:900;background:linear-gradient(180deg,#fff,#aad4ff);
-    -webkit-background-clip:text;background-clip:text;color:transparent;}
-  .go-stat .l{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);}
-  .record{color:var(--good);font-weight:800;letter-spacing:.06em;animation:pulse 1.2s ease-in-out infinite;}
-  @keyframes pulse{0%,100%{opacity:.65;}50%{opacity:1;}}
-  .muteRow{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13px;}
-  .hint{position:absolute;bottom:14px;left:0;right:0;text-align:center;color:var(--muted);font-size:12px;opacity:.8;}
+  /* ---------- ship selector ---------- */
+  #ship-label{font-size:11px;letter-spacing:.3em;color:rgba(160,200,230,.55);margin-bottom:10px;}
+  #ship-row{display:flex;gap:12px;margin-bottom:28px;flex-wrap:wrap;justify-content:center;}
+  .ship-card{
+    background:var(--panel);border:1px solid var(--accent-dim);border-radius:3px;
+    padding:10px 14px;min-width:158px;text-align:left;cursor:pointer;
+    transition:border-color .15s, background .15s, box-shadow .15s;
+  }
+  .ship-card:hover{border-color:var(--accent);}
+  .ship-card.sel{
+    border-color:var(--accent);background:rgba(127,223,255,.1);
+    box-shadow:0 0 14px rgba(127,223,255,.3);
+  }
+  .ship-card .sname{color:var(--accent);font-size:14px;letter-spacing:.15em;}
+  .ship-card .sclass{font-size:9px;color:rgba(160,200,230,.55);letter-spacing:.12em;margin-bottom:8px;}
+  .ship-card .srow{display:flex;align-items:center;gap:7px;font-size:9px;
+    color:rgba(160,200,230,.6);letter-spacing:.1em;margin-top:3px;}
+  .ship-card .bar{flex:1;height:4px;background:rgba(127,223,255,.12);border-radius:2px;overflow:hidden;}
+  .ship-card .bar i{display:block;height:100%;background:var(--accent);}
+  #overlay td{padding:4px 16px;font-size:13px;letter-spacing:.1em;text-align:left;}
+  #overlay td.k{color:var(--accent);text-align:right;}
+  #overlay .go{
+    font-size:15px;letter-spacing:.35em;color:#fff;
+    border:1px solid var(--accent-dim);padding:12px 34px;border-radius:3px;
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  #overlay .tiny{margin-top:26px;font-size:11px;color:rgba(160,200,230,.4);letter-spacing:.15em;}
+  #touch-note{margin-top:18px;font-size:12px;color:#ffb86b;letter-spacing:.15em;display:none;}
+  body.nocursor{cursor:none;}
 </style>
 </head>
 <body>
-  <div id="stage">
-    <canvas id="game"></canvas>
+
+<!-- ================= HUD (DOM overlay) ================= -->
+<div id="vignette"></div>
+<div id="hud">
+  <div class="panel" id="panel-loc">
+    <div><span class="lbl">SYSTEM&nbsp; :</span> <span id="hud-system" class="big">—</span></div>
+    <div><span class="lbl">PLANET&nbsp; :</span> <span id="hud-planet">—</span></div>
+    <div><span class="lbl">BIOME&nbsp;&nbsp; :</span> <span id="hud-biome">—</span></div>
+    <div><span class="lbl">GRAVITY :</span> <span id="hud-grav">—</span></div>
   </div>
-
-  <!-- In-game HUD -->
-  <div id="hud" style="display:none">
-    <div class="hud-top">
-      <div style="display:flex;gap:10px;">
-        <div class="stat"><div class="label">Height</div><div class="value" id="hHeight">0.0</div></div>
-        <div class="stat"><div class="label">Score</div><div class="value small" id="hScore">0</div></div>
-      </div>
-      <div style="display:flex;gap:10px;align-items:flex-start;">
-        <div class="stat"><div class="label">Best</div><div class="value small" id="hMax">0.0</div></div>
-        <div id="nextWrap">
-          <canvas id="nextCanvas" width="64" height="64"></canvas>
-        </div>
-        <button class="iconbtn" id="muteBtnGame" title="Mute">🔊</button>
-      </div>
-    </div>
-    <div class="hud-bottom">
-      <button class="btn ghost" id="rotateBtn">⟳ Rotate</button>
-      <button class="btn" id="dropBtn">Drop ▼</button>
-    </div>
+  <div class="panel" id="panel-nav">
+    <div><span class="lbl">SPEED</span>&nbsp; <span id="hud-speed" class="val">0</span> <span class="lbl">m/s</span></div>
+    <div><span class="lbl">ALT&nbsp;&nbsp;&nbsp;</span>&nbsp; <span id="hud-alt" class="val">0</span> <span class="lbl">m</span></div>
   </div>
-
-  <div id="popups"></div>
-
-  <!-- Start screen -->
-  <div class="overlay" id="startScreen">
-    <div class="title">GRAVITY<br>STACK</div>
-    <div class="subtitle">a physics balancing game</div>
-    <div class="card">
-      <h3>How to play</h3>
-      <div class="how">
-        <div>🫳 <b>Drag</b> left / right to slide the block.</div>
-        <div>🔄 <b>Tap</b> the block (or ⟳) to rotate 90°.</div>
-        <div>⬇️ <b>Drop</b> to release it onto the pile.</div>
-        <div>🏗️ Stack as <b>high</b> as you can without the tower toppling or blocks tumbling out.</div>
-      </div>
-    </div>
-    <div class="best">All-time best height: <b id="startBest">0.0</b> m</div>
-    <div class="row">
-      <button class="btn" id="playBtn">▶ Play</button>
-    </div>
-    <div class="muteRow">
-      <button class="iconbtn" id="muteBtnStart">🔊</button><span id="muteLabel">Sound on</span>
-    </div>
-    <div class="hint">Tip: rest each piece flat — a wobbly base brings the whole tower down.</div>
+  <div class="panel" id="panel-mode">
+    <div class="mode" id="hud-mode">STARSHIP</div>
+    <div class="hints" id="hud-hints"></div>
   </div>
+  <div id="prompt"></div>
+  <div id="reticle"></div>
+  <div id="markers"></div>
+</div>
 
-  <!-- Game over screen -->
-  <div class="overlay hidden" id="overScreen">
-    <div class="title" style="font-size:clamp(38px,11vw,76px)">GAME&nbsp;OVER</div>
-    <div id="recordBadge" class="record" style="display:none">★ NEW RECORD ★</div>
-    <div class="go-stats">
-      <div class="go-stat"><div class="v" id="goHeight">0.0</div><div class="l">Final height</div></div>
-      <div class="go-stat"><div class="v" id="goScore">0</div><div class="l">Score</div></div>
-      <div class="go-stat"><div class="v" id="goMax">0.0</div><div class="l">Max height</div></div>
-    </div>
-    <div class="best">All-time best: <b id="overBest">0.0</b> m</div>
-    <div class="row">
-      <button class="btn" id="againBtn">↻ Play again</button>
-    </div>
-  </div>
+<!-- ================= start / pause overlay ================= -->
+<div id="overlay">
+  <h1>STARFALL</h1>
+  <div class="sub">// EXPLORER — PROCEDURAL FRONTIER //</div>
+  <table>
+    <tr><td class="k">MOUSE</td><td>steer ship / look</td></tr>
+    <tr><td class="k">ARROWS</td><td>steer with keys instead</td></tr>
+    <tr><td class="k">W / S</td><td>thrust up / down</td></tr>
+    <tr><td class="k">A / D</td><td>roll (ship) — strafe (on foot)</td></tr>
+    <tr><td class="k">SPACE</td><td>boost (ship) — jump (on foot)</td></tr>
+    <tr><td class="k">SHIFT</td><td>sprint (on foot)</td></tr>
+    <tr><td class="k">F</td><td>land / exit / board ship</td></tr>
+    <tr><td class="k">V</td><td>toggle camera (on foot)</td></tr>
+  </table>
+  <div id="ship-label">// SELECT YOUR SHIP — SWITCH ANY TIME FROM THIS SCREEN //</div>
+  <div id="ship-row"></div>
+  <div class="go" id="go-label">GENERATING UNIVERSE…</div>
+  <div id="touch-note">TOUCH DEVICE DETECTED — THIS GAME NEEDS A KEYBOARD &amp; MOUSE</div>
+  <div class="tiny" id="seed-label"></div>
+</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+<!-- Watchdog: if the module script never booted (CDN unreachable, JS error),
+     say so on the title screen instead of failing silently. -->
 <script>
-(function(){
-"use strict";
-
-/* ======================================================================
-   GRAVITY STACK — physics tower stacking
-   Matter.js for physics, custom canvas renderer, Web Audio for sound.
-   ====================================================================== */
-
-const { Engine, World, Bodies, Body, Composite, Events } = Matter;
-
-// ---- world constants (world units == design pixels) ----
-const W        = 380;          // interior field width
-const WALL_T   = 40;           // wall thickness
-const FLOOR_Y  = 1200;         // y of the floor top surface
-const CELL     = 30;           // tetromino cell size
-const SPAWN_GAP = 6 * CELL;    // how far above the pile a new piece appears
-const VIEW_H_MIN = 24 * CELL;  // always keep at least this much world-height visible
-
-// ---- DOM ----
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const nextCanvas = document.getElementById('nextCanvas');
-const nctx = nextCanvas.getContext('2d');
-const hud = document.getElementById('hud');
-const startScreen = document.getElementById('startScreen');
-const overScreen = document.getElementById('overScreen');
-const popupsEl = document.getElementById('popups');
-
-const el = id => document.getElementById(id);
-
-// ---- responsive sizing ----
-let DPR = 1, cssW = 0, cssH = 0, scale = 1, viewW = W, viewH = 800;
-function resize(){
-  DPR = Math.min(window.devicePixelRatio || 1, 2.5);
-  cssW = window.innerWidth; cssH = window.innerHeight;
-  canvas.width = Math.floor(cssW * DPR);
-  canvas.height = Math.floor(cssH * DPR);
-  // Fit the field width, but never zoom in so far that we lose vertical
-  // context: on wide/landscape windows the height constraint dominates so
-  // we letterbox the (narrow) field horizontally instead of over-zooming.
-  const fitWidth  = cssW / (W + WALL_T * 2 + 24);
-  const fitHeight = cssH / VIEW_H_MIN;
-  scale = Math.min(fitWidth, fitHeight);
-  viewW = cssW / scale;
-  viewH = cssH / scale;
-}
-function groundViewTop(){
-  // Place the floor a fixed number of CSS pixels above the bottom HUD bar so
-  // the landing zone is never hidden behind the Drop/Rotate buttons.
-  const bottomHudCss = 124;
-  return FLOOR_Y - (cssH - bottomHudCss)/scale;
-}
-window.addEventListener('resize', resize);
-resize();
-
-/* ======================================================================
-   AUDIO  (Web Audio API, fully synthesized)
-   ====================================================================== */
-const Sound = (function(){
-  let actx = null, master = null, muted = false;
-  function init(){
-    if(actx) return;
-    actx = new (window.AudioContext||window.webkitAudioContext)();
-    master = actx.createGain();
-    master.gain.value = 0.5;
-    master.connect(actx.destination);
-  }
-  function resume(){ if(actx && actx.state === 'suspended') actx.resume(); }
-  function setMuted(m){ muted = m; if(master) master.gain.value = m?0:0.5; }
-  function isMuted(){ return muted; }
-
-  function tone(freq, dur, type, vol, slideTo, delay){
-    if(!actx || muted) return;
-    const t0 = actx.currentTime + (delay||0);
-    const o = actx.createOscillator();
-    const g = actx.createGain();
-    o.type = type||'sine';
-    o.frequency.setValueAtTime(freq, t0);
-    if(slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0+dur);
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(vol||0.3, t0+0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-    o.connect(g); g.connect(master);
-    o.start(t0); o.stop(t0+dur+0.02);
-  }
-  function noise(dur, vol, filterFreq){
-    if(!actx || muted) return;
-    const t0 = actx.currentTime;
-    const len = Math.floor(actx.sampleRate*dur);
-    const buf = actx.createBuffer(1, len, actx.sampleRate);
-    const data = buf.getChannelData(0);
-    for(let i=0;i<len;i++){ data[i] = (Math.random()*2-1)*(1-i/len); }
-    const src = actx.createBufferSource(); src.buffer = buf;
-    const f = actx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=filterFreq||1200;
-    const g = actx.createGain(); g.gain.value = vol||0.3;
-    src.connect(f); f.connect(g); g.connect(master);
-    src.start(t0);
-  }
-
-  return {
-    init, resume, setMuted, isMuted,
-    rotate(){ tone(520, 0.08, 'square', 0.12, 720); },
-    drop(){ tone(380, 0.18, 'sawtooth', 0.12, 120); },
-    land(){ tone(150, 0.16, 'sine', 0.32, 70); noise(0.1,0.12,500); },
-    clean(){ // little ascending arpeggio
-      [523,659,784,1047].forEach((f,i)=>tone(f,0.18,'triangle',0.18,null,i*0.06));
-    },
-    danger(){ tone(110,0.4,'sawtooth',0.16,90); },
-    collapse(){ noise(0.6,0.4,900); tone(90,0.7,'sawtooth',0.25,40); }
-  };
-})();
-
-/* ======================================================================
-   TETROMINOES
-   ====================================================================== */
-const SHAPES = {
-  I:{cells:[[0,0],[1,0],[2,0],[3,0]], c:['#5ee7ff','#1e9fd6']},
-  O:{cells:[[0,0],[1,0],[0,1],[1,1]], c:['#ffd25e','#e09b1e']},
-  T:{cells:[[0,0],[1,0],[2,0],[1,1]], c:['#b388ff','#7a4fd6']},
-  S:{cells:[[1,0],[2,0],[0,1],[1,1]], c:['#5dffa0','#1ec46e']},
-  Z:{cells:[[0,0],[1,0],[1,1],[2,1]], c:['#ff7b9c','#d6356a']},
-  J:{cells:[[0,0],[0,1],[1,1],[2,1]], c:['#7fa6ff','#3f63d6']},
-  L:{cells:[[2,0],[0,1],[1,1],[2,1]], c:['#ffae5e','#e0741e']}
-};
-const TYPES = Object.keys(SHAPES);
-
-// rotate grid cells `r` times by 90°, return normalized {cells, offsets, centroid, bounds}
-function buildPiece(type, r){
-  let cells = SHAPES[type].cells.map(c=>[c[0],c[1]]);
-  for(let i=0;i<((r%4)+4)%4;i++){
-    cells = cells.map(([x,y])=>[ -y, x ]);
-  }
-  // normalize to min 0
-  const minx = Math.min(...cells.map(c=>c[0]));
-  const miny = Math.min(...cells.map(c=>c[1]));
-  cells = cells.map(([x,y])=>[x-minx,y-miny]);
-  // pixel centers
-  const centers = cells.map(([x,y])=>({x:(x+0.5)*CELL, y:(y+0.5)*CELL}));
-  const cx = centers.reduce((s,c)=>s+c.x,0)/centers.length;
-  const cy = centers.reduce((s,c)=>s+c.y,0)/centers.length;
-  const offsets = centers.map(c=>({x:c.x-cx, y:c.y-cy}));
-  const halfW = Math.max(...offsets.map(o=>o.x)) + CELL/2;
-  const nhalfW = Math.min(...offsets.map(o=>o.x)) - CELL/2;
-  const halfH = Math.max(...offsets.map(o=>o.y)) + CELL/2;
-  const nhalfH = Math.min(...offsets.map(o=>o.y)) - CELL/2;
-  return { offsets, left:nhalfW, right:halfW, top:nhalfH, bottom:halfH, color:SHAPES[type].c };
-}
-
-/* ======================================================================
-   PARTICLES
-   ====================================================================== */
-let particles = [];
-function spawnParticles(x, y, color, count, power){
-  for(let i=0;i<count;i++){
-    const a = Math.random()*Math.PI*2;
-    const sp = (Math.random()*0.6+0.4)*(power||4);
-    particles.push({
-      x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - Math.random()*2,
-      life:1, decay:0.012+Math.random()*0.02, size:Math.random()*4+2, color
-    });
-  }
-}
-function updateParticles(dt){
-  for(let i=particles.length-1;i>=0;i--){
-    const p=particles[i];
-    p.vy += 0.25; p.x+=p.vx; p.y+=p.vy; p.vx*=0.99;
-    p.life -= p.decay;
-    if(p.life<=0) particles.splice(i,1);
-  }
-}
-
-/* ======================================================================
-   GAME STATE
-   ====================================================================== */
-let engine, world, walls=[];
-let settled = [];          // resting/physics tetromino bodies
-let active = null;         // currently falling body (after drop)
-let activeMaxSpeed = 0, activeFallTime = 0;
-let controlled = null;     // {type, rot, x, piece}
-let nextType = null;
-let state = 'start';        // start | playing | over
-let score = 0;
-let height = 0, maxHeight = 0, displayHeight = 0;
-let bestHeight = parseFloat(localStorage.getItem('gravstack_best')||'0')||0;
-let viewTop = groundViewTop();   // world y at top of screen
-let targetViewTop = viewTop;
-let shake = 0;
-let danger = false, dangerWasOn = false;
-let stillTimer = 0, landingPending = false;
-let spawnDelay = 0;        // countdown before next piece appears
-let lastTime = performance.now();
-let bgGridOffset = 0;
-
-function rand(a,b){ return a + Math.random()*(b-a); }
-
-function newType(){ return TYPES[(Math.random()*TYPES.length)|0]; }
-
-/* ---- engine setup ---- */
-function setupEngine(){
-  engine = Engine.create();
-  world = engine.world;
-  engine.gravity.y = 1.0;
-  engine.positionIterations = 10;
-  engine.velocityIterations = 8;
-
-  const wallOpts = {isStatic:true, friction:0.9, render:{}};
-  // floor + tall side walls (walls effectively infinite so pieces stay in field)
-  const floor = Bodies.rectangle(W/2, FLOOR_Y+WALL_T/2, W+WALL_T*2, WALL_T, wallOpts);
-  const tall = 40000;
-  const left = Bodies.rectangle(-WALL_T/2, FLOOR_Y - tall/2, WALL_T, tall, wallOpts);
-  const right = Bodies.rectangle(W+WALL_T/2, FLOOR_Y - tall/2, WALL_T, tall, wallOpts);
-  walls = [floor,left,right];
-  World.add(world, walls);
-}
-
-function makeBody(type, rot, x, y){
-  const piece = buildPiece(type, rot);
-  const parts = piece.offsets.map(o =>
-    Bodies.rectangle(x+o.x, y+o.y, CELL-1.5, CELL-1.5, {})
-  );
-  const body = Body.create({
-    parts, friction:0.62, frictionStatic:0.9, restitution:0.02, density:0.0016
+  addEventListener('error', function(e){
+    if(!window.STARFALL){
+      var g = document.getElementById('go-label');
+      if(g) g.textContent = 'ERROR — ' + (e.message || 'failed to start');
+    }
   });
-  body.plugin = { offsets:piece.offsets, color:piece.color, type };
-  return body;
-}
+  setTimeout(function(){
+    if(!window.STARFALL){
+      var g = document.getElementById('go-label');
+      if(g && g.textContent.indexOf('ERROR') < 0)
+        g.textContent = 'LOAD ERROR — CHECK CONNECTION (three.js CDN)';
+    }
+  }, 12000);
+</script>
 
-/* ---- piece flow ---- */
-function spawnControlled(){
-  const type = nextType || newType();
-  nextType = newType();
-  const piece = buildPiece(type, 0);
-  // spawn a fixed distance above the current pile top
-  const y = currentTop() - SPAWN_GAP;
-  controlled = { type, rot:0, x:W/2, y, piece };
-  clampControlled();
-  drawNextPreview();
-}
-
-function clampControlled(){
-  if(!controlled) return;
-  const p = controlled.piece;
-  controlled.x = Math.max(-p.left, Math.min(W - p.right, controlled.x));
-}
-
-function rotateControlled(){
-  if(!controlled || state!=='playing') return;
-  const nr = (controlled.rot+1)%4;
-  controlled.piece = buildPiece(controlled.type, nr);
-  controlled.rot = nr;
-  clampControlled();
-  Sound.rotate();
-}
-
-function dropControlled(){
-  if(!controlled || state!=='playing') return;
-  const c = controlled;
-  const body = makeBody(c.type, c.rot, c.x, c.y);
-  Body.setVelocity(body, {x:0,y:6});
-  World.add(world, body);
-  settled.push(body);
-  active = body; activeMaxSpeed=0; activeFallTime=0;
-  controlled = null;
-  Sound.drop();
-}
-
-/* ---- measurements ---- */
-function currentTop(){
-  // smallest y (highest point) among settled bodies; FLOOR_Y if empty
-  let top = FLOOR_Y;
-  for(const b of settled){
-    if(b===active) continue;
-    if(b.bounds.min.y < top) top = b.bounds.min.y;
+<!-- Three.js via CDN — no build step. Bump the version here if you like. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
   }
-  return top;
 }
-function topAllSettled(){
-  let top = FLOOR_Y;
-  for(const b of settled){ if(b.bounds.min.y < top) top = b.bounds.min.y; }
-  return top;
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass }      from 'three/addons/postprocessing/OutputPass.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ==================================================================
+   CONFIG — the knobs you'll most likely want to tweak live here.
+   ================================================================== */
+const CONFIG = {
+  PLANET_COUNT : 6,          // planets in the system (>=5 guarantees one of each biome)
+  SYSTEM_RADIUS: 26000,      // planets sit between ~7000 m and this distance from the sun
+  PLANET_RADIUS: [750, 1400],// min / max planet radius (m)
+
+  FOOT: {
+    WALK_SPEED  : 6.0,       // m/s
+    SPRINT_MULT : 1.9,
+    JUMP_HEIGHT : 1.5,       // metres (on a 1g planet)
+    EYE_HEIGHT  : 1.65,
+    LOOK_SENS   : 0.0022,
+  },
+
+  LAND_MAX_ALT   : 30,       // may land below this altitude (m) ...
+  LAND_MAX_SPEED : 45,       // ... and below this speed (m/s)
+
+  BLOOM: { strength: 0.45, radius: 0.6, threshold: 0.82 },
+
+  STARS  : 9000,                        // starfield point count
+  PROPS  : { trees: 460, rocks: 200 },  // scattered per planet (biome permitting)
+};
+
+/* ------------------------------------------------------------------
+   SHIPS — the flyable roster, slowest to fastest. Pick one on the
+   title screen (or pause with Esc mid-game and switch).
+   MAX_SPEED  : cruise top speed, m/s
+   BOOST_MULT : boost multiplier while holding Space
+   ATMO_CAP   : speed cap inside an atmosphere
+   TURN_SENS  : mouse steering sensitivity (higher = twitchier)
+   ROLL_SPEED : A/D roll rate, rad/s
+   ACCEL      : how quickly speed chases the throttle
+   camOffset  : chase camera offset in ship-local space
+   Add a ship: push an entry here + a build function (see buildStarfall).
+   ------------------------------------------------------------------ */
+const SHIPS = [
+  { name:'WAYFARER', cls:'HAULER', desc:'steady freighter', glow:0xffb35c,
+    stats:{ MAX_SPEED:260, BOOST_MULT:2.6, ATMO_CAP:340, TURN_SENS:0.0015, ROLL_SPEED:1.3, ACCEL:1.5 },
+    camOffset:[0, 4.4, 14], build:()=>buildWayfarer() },
+  { name:'STARFALL', cls:'EXPLORER', desc:'balanced all-rounder', glow:0x6fd8ff,
+    stats:{ MAX_SPEED:320, BOOST_MULT:3.2, ATMO_CAP:420, TURN_SENS:0.0021, ROLL_SPEED:1.9, ACCEL:2.2 },
+    camOffset:[0, 3.4, 11.5], build:()=>buildStarfall() },
+  { name:'VIPER', cls:'FIGHTER', desc:'fast & agile', glow:0xff8844,
+    stats:{ MAX_SPEED:600, BOOST_MULT:3.6, ATMO_CAP:680, TURN_SENS:0.0028, ROLL_SPEED:2.6, ACCEL:3.0 },
+    camOffset:[0, 3.2, 11], build:()=>buildViper() },
+  { name:'PHANTOM', cls:'INTERCEPTOR', desc:'blistering, twitchy', glow:0xb07fff,
+    stats:{ MAX_SPEED:960, BOOST_MULT:4.2, ATMO_CAP:900, TURN_SENS:0.0034, ROLL_SPEED:3.2, ACCEL:3.6 },
+    camOffset:[0, 3.0, 11.5], build:()=>buildPhantom() },
+];
+
+/* ------------------------------------------------------------------
+   BIOMES — everything here is safe to play with.
+   colors  : [t, hex] gradient stops over terrain height t in 0..1
+             (0 = deepest valley, 1 = highest peak)
+   amp     : vertical terrain amplitude in metres
+   freq    : continental noise frequency (bigger = smaller landmasses)
+   ridged  : 0..1 blend towards sharp ridged noise (jagged mountains)
+   maskBias: mountain-region coverage — lower = more of the planet is
+             extreme terrain, higher = mostly calm plains
+   cliff   : bare-rock colour blended onto steep faces
+   water   : sea level as 0..1 of the height range (null = no ocean)
+   atmo    : rim-glow colour seen from orbit;  fog: sky/haze colour
+   props   : which scatter models to use (see PROP_GEOS)
+   ------------------------------------------------------------------ */
+const BIOMES = {
+  VOLCANIC: {
+    amp: 130, freq: 3.2, detailFreq: 11, ridged: 0.85, water: null,
+    maskBias: -0.10, cliff: 0x1a1315,
+    colors: [[0.00,0xff4400],[0.10,0xdd3300],[0.22,0x551a10],[0.45,0x3a2420],[0.70,0x2a2226],[1.00,0x171317]],
+    atmo: 0xff5522, fog: 0xb2402a, cloud: 0x442222, cloudOpacity: 0.5,
+    props: { trees: 'spike', rocks: 'lava' },
+  },
+  OCEANIC: {
+    amp: 70, freq: 2.6, detailFreq: 9, ridged: 0.1, water: 0.52,
+    maskBias: 0.12, cliff: 0x7a6a55,
+    colors: [[0.00,0x0d2b52],[0.45,0x14486e],[0.53,0xd8c391],[0.60,0x5a9e52],[0.80,0x3c7440],[1.00,0x9fb8a6]],
+    waterColor: 0x1566aa,
+    atmo: 0x5fb8ff, fog: 0x9fd4f4, cloud: 0xffffff, cloudOpacity: 0.85,
+    props: { trees: 'palm', rocks: 'round' },
+  },
+  GLACIAL: {
+    amp: 100, freq: 3.0, detailFreq: 12, ridged: 0.45, water: 0.30,
+    maskBias: 0.02, cliff: 0x5c7285,
+    colors: [[0.00,0x8fb8d8],[0.30,0xb8d8ec],[0.45,0xe8f2fa],[0.70,0xf4f9ff],[1.00,0xcfe4f2]],
+    waterColor: 0x2b6f9e,
+    atmo: 0xaadfff, fog: 0xcfe6f2, cloud: 0xffffff, cloudOpacity: 0.7,
+    props: { trees: 'pine', rocks: 'grey' },
+  },
+  LUSH: {
+    amp: 65, freq: 2.8, detailFreq: 10, ridged: 0.2, water: 0.34,
+    maskBias: 0.15, cliff: 0x6b5f4c,
+    colors: [[0.00,0x0e3c58],[0.32,0x2c6e50],[0.42,0x3f8a4a],[0.62,0x59a344],[0.82,0x6e7d4a],[1.00,0x9aa08c]],
+    waterColor: 0x1b6f9e,
+    atmo: 0x7fd4a8, fog: 0xa8d8c0, cloud: 0xffffff, cloudOpacity: 0.8,
+    props: { trees: 'leafy', rocks: 'grey' },
+  },
+  BARREN: {
+    amp: 110, freq: 3.4, detailFreq: 13, ridged: 0.55, water: null,
+    maskBias: -0.02, cliff: 0x453f39,
+    colors: [[0.00,0x35322f],[0.30,0x55504a],[0.55,0x6e6862],[0.80,0x8a837c],[1.00,0xa39a90]],
+    atmo: 0x8f8578, fog: 0x9a8f82, cloud: 0x998877, cloudOpacity: 0.18,
+    props: { trees: null, rocks: 'grey' },
+  },
+};
+
+/* ------------------------------------------------------------------
+   NAME GENERATOR — invented sci-fi words built from syllables.
+   Add/remove syllables to change the flavour of the names.
+   ------------------------------------------------------------------ */
+const NAME = {
+  start: ['Mun','Syn','Vel','Kor','Tha','Zeph','Ori','Dra','Xan','Qua','Ere','Nym','Vol','Ath','Kel','Ist','Ura','Bel','Osh','Ryn'],
+  mid  : ['vo','qua','na','ri','ta','lo','ze','mi','ka','du','sha','ve','or','il','un','ra','ge','no','ba','xi'],
+  end  : ['ri','ach','os','ea','um','ar','is','on','ax','ia','eth','or','us','ei','ov','yn'],
+  planetSuffix: ['Prime','Major','Minor','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'],
+};
+
+/* ==================================================================
+   SMALL UTILITIES — seeded RNG + 3D simplex noise
+   ================================================================== */
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
-function recomputeHeight(){
-  const top = currentTop();
-  height = Math.max(0, (FLOOR_Y - top) / CELL);
-  if(state==='playing' && height>maxHeight) maxHeight = height;
+/* Classic 3D simplex noise (after Gustavson), permutation shuffled by seed. */
+class Simplex3 {
+  constructor(rand){
+    this.p = new Uint8Array(512);
+    const perm = new Uint8Array(256);
+    for (let i=0;i<256;i++) perm[i]=i;
+    for (let i=255;i>0;i--){ const j=(rand()*(i+1))|0; const t=perm[i]; perm[i]=perm[j]; perm[j]=t; }
+    for (let i=0;i<512;i++) this.p[i]=perm[i&255];
+    this.grad = [[1,1,0],[-1,1,0],[1,-1,0],[-1,-1,0],[1,0,1],[-1,0,1],[1,0,-1],[-1,0,-1],[0,1,1],[0,-1,1],[0,1,-1],[0,-1,-1]];
+  }
+  noise(x,y,z){
+    const p=this.p, grad=this.grad, F3=1/3, G3=1/6;
+    const s=(x+y+z)*F3;
+    const i=Math.floor(x+s), j=Math.floor(y+s), k=Math.floor(z+s);
+    const t=(i+j+k)*G3;
+    const x0=x-(i-t), y0=y-(j-t), z0=z-(k-t);
+    let i1,j1,k1,i2,j2,k2;
+    if(x0>=y0){ if(y0>=z0){i1=1;j1=0;k1=0;i2=1;j2=1;k2=0;}
+      else if(x0>=z0){i1=1;j1=0;k1=0;i2=1;j2=0;k2=1;}
+      else{i1=0;j1=0;k1=1;i2=1;j2=0;k2=1;} }
+    else{ if(y0<z0){i1=0;j1=0;k1=1;i2=0;j2=1;k2=1;}
+      else if(x0<z0){i1=0;j1=1;k1=0;i2=0;j2=1;k2=1;}
+      else{i1=0;j1=1;k1=0;i2=1;j2=1;k2=0;} }
+    const x1=x0-i1+G3, y1=y0-j1+G3, z1=z0-k1+G3;
+    const x2=x0-i2+2*G3, y2=y0-j2+2*G3, z2=z0-k2+2*G3;
+    const x3=x0-1+3*G3, y3=y0-1+3*G3, z3=z0-1+3*G3;
+    const ii=i&255, jj=j&255, kk=k&255;
+    let n=0;
+    let t0=0.6-x0*x0-y0*y0-z0*z0;
+    if(t0>0){ t0*=t0; const g=grad[p[ii+p[jj+p[kk]]]%12]; n+=t0*t0*(g[0]*x0+g[1]*y0+g[2]*z0); }
+    let t1=0.6-x1*x1-y1*y1-z1*z1;
+    if(t1>0){ t1*=t1; const g=grad[p[ii+i1+p[jj+j1+p[kk+k1]]]%12]; n+=t1*t1*(g[0]*x1+g[1]*y1+g[2]*z1); }
+    let t2=0.6-x2*x2-y2*y2-z2*z2;
+    if(t2>0){ t2*=t2; const g=grad[p[ii+i2+p[jj+j2+p[kk+k2]]]%12]; n+=t2*t2*(g[0]*x2+g[1]*y2+g[2]*z2); }
+    let t3=0.6-x3*x3-y3*y3-z3*z3;
+    if(t3>0){ t3*=t3; const g=grad[p[ii+1+p[jj+1+p[kk+1]]]%12]; n+=t3*t3*(g[0]*x3+g[1]*y3+g[2]*z3); }
+    return 32*n; // roughly -1..1
+  }
+  fbm(x,y,z,oct=4,lac=2,gain=0.5){
+    let a=0.5, f=1, sum=0, norm=0;
+    for(let o=0;o<oct;o++){ sum+=a*this.noise(x*f,y*f,z*f); norm+=a; a*=gain; f*=lac; }
+    return sum/norm;
+  }
+  ridged(x,y,z,oct=4,lac=2,gain=0.5){
+    let a=0.5, f=1, sum=0, norm=0;
+    for(let o=0;o<oct;o++){ sum+=a*(1-Math.abs(this.noise(x*f,y*f,z*f))*2); norm+=a; a*=gain; f*=lac; }
+    return sum/norm; // -1..1, sharp crests near 1
+  }
 }
 
-/* ======================================================================
-   GAME LIFECYCLE
-   ====================================================================== */
-function startGame(){
-  // reset
-  if(world){ World.clear(world,false); }
-  setupEngine();
-  settled=[]; active=null; controlled=null; particles=[];
-  score=0; height=0; maxHeight=0; displayHeight=0;
-  nextType=newType();
-  state='playing';
-  shake=0; danger=false; dangerWasOn=false; stillTimer=0; landingPending=false;
-  spawnDelay=0;
-  viewTop = groundViewTop(); targetViewTop = viewTop;
-  startScreen.classList.add('hidden');
-  overScreen.classList.add('hidden');
-  hud.style.display='block';
-  spawnControlled();
-  updateHUD();
+const lerp=(a,b,t)=>a+(b-a)*t;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const smoothstep=t=>t*t*(3-2*t);
+
+function makeWord(rand, minSyl=2, maxSyl=3){
+  const n = minSyl + ((rand()*(maxSyl-minSyl+1))|0);
+  let w = NAME.start[(rand()*NAME.start.length)|0];
+  for(let i=1;i<n;i++) w += NAME.mid[(rand()*NAME.mid.length)|0];
+  w += NAME.end[(rand()*NAME.end.length)|0];
+  return w;
 }
 
-function gameOver(reason){
-  if(state!=='over' && reason==='collapse'){ Sound.collapse(); }
-  state='over';
-  controlled=null; active=null;
-  // big collapse particle burst
-  const top = topAllSettled();
-  for(let i=0;i<3;i++) spawnParticles(rand(40,W-40), rand(top, top+120), '#ff7b9c', 14, 7);
-  shake = Math.max(shake, 16);
-
-  const finalH = height, finalScore=score, finalMax=maxHeight;
-  const isRecord = finalMax > bestHeight + 0.001;
-  if(isRecord){ bestHeight = finalMax; localStorage.setItem('gravstack_best', bestHeight.toFixed(2)); }
-
-  setTimeout(()=>{
-    hud.style.display='none';
-    el('goHeight').textContent = finalH.toFixed(1);
-    el('goScore').textContent = finalScore.toLocaleString();
-    el('goMax').textContent = finalMax.toFixed(1);
-    el('overBest').textContent = bestHeight.toFixed(1);
-    el('recordBadge').style.display = isRecord ? 'block' : 'none';
-    overScreen.classList.remove('hidden');
-  }, 650);
+/* gradient stop lookup for terrain colouring */
+const _gc = new THREE.Color();
+function gradColor(stops, t, out){
+  t = clamp(t, 0, 1);
+  for(let i=0;i<stops.length-1;i++){
+    const [t0,c0]=stops[i], [t1,c1]=stops[i+1];
+    if(t<=t1 || i===stops.length-2){
+      const f = clamp((t-t0)/Math.max(1e-6,t1-t0),0,1);
+      return out.setHex(c0).lerp(_gc.setHex(c1), f);
+    }
+  }
+  return out.setHex(stops[stops.length-1][1]);
 }
 
-function popup(text, color){
-  const d = document.createElement('div');
-  d.className='popup'; d.textContent=text;
-  if(color) d.style.color=color;
-  d.style.left = (40+Math.random()*20)+'%';
-  popupsEl.appendChild(d);
-  setTimeout(()=>d.remove(), 1700);
+/* ==================================================================
+   GLOBAL STATE
+   ================================================================== */
+const urlSeed = new URLSearchParams(location.search).get('seed');
+const SEED = urlSeed ? (parseInt(urlSeed,10)>>>0) : (Math.random()*0xffffffff)>>>0;
+const rng = mulberry32(SEED);
+
+let renderer, scene, camera, composer;
+let starPoints, sunGlow;
+let planets = [];        // planet records, see createPlanet()
+let systemName = '';
+let ship, player;
+let mode = 'STARSHIP';   // STARSHIP | LANDING | FOOT
+let paused = true;
+const keys = {};
+let mouseDX = 0, mouseDY = 0;
+const clock = new THREE.Clock();
+
+// camera blending (smooth transitions between ship-cam and foot-cam)
+const camBlend = { active:false, t:0, dur:0.7, fromPos:new THREE.Vector3(), fromQuat:new THREE.Quaternion() };
+const camTargetPos = new THREE.Vector3();
+const camTargetQuat = new THREE.Quaternion();
+
+// landing autopilot tween
+const landing = { t:0, dur:1.1, planet:null,
+  fromPos:new THREE.Vector3(), fromQuat:new THREE.Quaternion(),
+  toPos:new THREE.Vector3(),   toQuat:new THREE.Quaternion() };
+
+// scratch objects (avoid per-frame allocation)
+const _v1=new THREE.Vector3(), _v2=new THREE.Vector3(), _v3=new THREE.Vector3(), _v4=new THREE.Vector3();
+const _q1=new THREE.Quaternion();
+const _m1=new THREE.Matrix4();
+const _c1=new THREE.Color(), _c2=new THREE.Color();
+const UP=new THREE.Vector3(0,1,0), FWD=new THREE.Vector3(0,0,-1);
+const X_AXIS=new THREE.Vector3(1,0,0), Z_AXIS=new THREE.Vector3(0,0,1);
+
+/* ==================================================================
+   RENDERER / SCENE / POST-PROCESSING
+   ================================================================== */
+function initRenderer(){
+  renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  document.body.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x02030a);
+  scene.fog = new THREE.Fog(0x000000, 1e7, 2e7); // retuned live each frame
+
+  camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.5, 400000);
+
+  composer = new EffectComposer(renderer);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),
+    CONFIG.BLOOM.strength, CONFIG.BLOOM.radius, CONFIG.BLOOM.threshold));
+  composer.addPass(new OutputPass());
+
+  addEventListener('resize', ()=>{
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+    composer.setSize(innerWidth, innerHeight);
+  });
 }
 
-/* ======================================================================
-   UPDATE LOOP
-   ====================================================================== */
-function update(dt){
-  if(state!=='playing') {
-    // still simulate so collapse animation looks alive on game over
-    if(state==='over'){ Engine.update(engine, 1000/60); }
-    return;
+/* ==================================================================
+   SKY — starfield, nebulae, sun
+   ================================================================== */
+function makeGlowSprite(hexInner, hexOuter, size=256){
+  const cv = document.createElement('canvas'); cv.width=cv.height=size;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createRadialGradient(size/2,size/2,0, size/2,size/2,size/2);
+  g.addColorStop(0, hexInner);
+  g.addColorStop(0.35, hexOuter);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,size,size);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function initSky(){
+  // --- starfield: one big shell of tinted points ---
+  const R = 180000, N = CONFIG.STARS;
+  const pos = new Float32Array(N*3), col = new Float32Array(N*3);
+  const tint = new THREE.Color();
+  for(let i=0;i<N;i++){
+    const z = rng()*2-1, a = rng()*Math.PI*2, r = Math.sqrt(1-z*z);
+    pos[i*3]=r*Math.cos(a)*R; pos[i*3+1]=z*R; pos[i*3+2]=r*Math.sin(a)*R;
+    tint.setHSL(0.55+(rng()-0.5)*0.25, rng()*0.5, 0.55+rng()*0.45);
+    col[i*3]=tint.r; col[i*3+1]=tint.g; col[i*3+2]=tint.b;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  g.setAttribute('color', new THREE.BufferAttribute(col,3));
+  starPoints = new THREE.Points(g, new THREE.PointsMaterial({
+    size:2.0, sizeAttenuation:false, vertexColors:true,
+    transparent:true, opacity:1, fog:false, depthWrite:false,
+  }));
+  starPoints.frustumCulled = false;
+  scene.add(starPoints);
+
+  // --- faint nebulae: a few huge additive sprites ---
+  const nebColors = [['rgba(120,80,200,0.55)','rgba(40,20,90,0.18)'],
+                     ['rgba(60,140,220,0.5)','rgba(20,50,110,0.16)'],
+                     ['rgba(200,90,140,0.45)','rgba(90,25,60,0.14)']];
+  for(let i=0;i<7;i++){
+    const [ci,co] = nebColors[i%nebColors.length];
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: makeGlowSprite(ci,co), blending:THREE.AdditiveBlending,
+      transparent:true, opacity:0.14+rng()*0.1, fog:false, depthWrite:false,
+    }));
+    const z = rng()*2-1, a = rng()*Math.PI*2, r = Math.sqrt(1-z*z), D=140000;
+    s.position.set(r*Math.cos(a)*D, z*D*0.6, r*Math.sin(a)*D);
+    const sz = 40000+rng()*60000;
+    s.scale.set(sz,sz,1);
+    scene.add(s);
   }
 
-  // difficulty: gravity & spawn speed rise gently with height
-  const diff = Math.min(maxHeight/40, 1);
-  engine.gravity.y = 1.0 + diff*0.5;
+  // --- the sun: emissive sphere + glow sprite + point light ---
+  const sunR = 420;
+  scene.add(new THREE.Mesh(
+    new THREE.SphereGeometry(sunR, 32, 16),
+    new THREE.MeshBasicMaterial({ color:0xfff4d8, fog:false })
+  ));
+  sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: makeGlowSprite('rgba(255,240,210,1)','rgba(255,150,60,0.35)'),
+    blending:THREE.AdditiveBlending, transparent:true, fog:false, depthWrite:false,
+  }));
+  sunGlow.scale.set(sunR*16, sunR*16, 1);
+  scene.add(sunGlow);
 
-  // step physics (fixed)
-  Engine.update(engine, 1000/60);
+  // decay 0 → the one sun lights every planet in the system
+  scene.add(new THREE.PointLight(0xfff0dd, 2.2, 0, 0));
+  scene.add(new THREE.AmbientLight(0x4e6088, 0.78)); // cool fill — keeps night sides readable
+}
 
-  // ---- active piece settle detection ----
-  if(active){
-    activeFallTime += dt;
-    const sp = active.speed;
-    if(sp>activeMaxSpeed) activeMaxSpeed = sp;
-    const settledNow = sp<0.34 && active.angularSpeed<0.02 &&
-                       activeFallTime>0.35 && (activeMaxSpeed>0.6 || activeFallTime>1.2);
-    if(settledNow){
-      onPieceLanded(active);
-      active=null;
+/* ==================================================================
+   PLANETS
+   ================================================================== */
+
+/* Terrain height field. Returns SURFACE RADIUS (m) at unit direction
+   `dir` for a planet. This single analytic function drives the mesh,
+   prop placement, flight collision AND walking — so physics and
+   visuals always agree. */
+function terrainRadius(p, dir){
+  const b = p.biome, n = p.noise, o = p.noiseOffset;
+  const x = dir.x + o, y = dir.y + o*1.7, z = dir.z + o*0.6;
+  // gentle continent-scale rolling everywhere
+  const base = n.fbm(x*b.freq, y*b.freq, z*b.freq, 3);
+  // region mask: most of the surface stays calm plains, selected regions
+  // become extreme terrain (mountain ranges, ridge fields, deep rifts)
+  const m = n.fbm(x*1.6+9.2, y*1.6+9.2, z*1.6+9.2, 2);
+  const mask = smoothstep(clamp((m - b.maskBias)/0.35, 0, 1));
+  const ridge  = n.ridged(x*b.detailFreq, y*b.detailFreq, z*b.detailFreq, 4);
+  const detail = n.fbm   (x*b.detailFreq, y*b.detailFreq, z*b.detailFreq, 3);
+  const h = base*0.5 + mask * lerp(detail, ridge, b.ridged) * 1.5;
+  let R = p.radius + h * b.amp;
+  // large landmark features (volcano cones with crater rims) are part of
+  // the height field itself, so they collide and can be climbed on foot
+  if(p.features) for(const f of p.features){
+    const ang = Math.acos(clamp(dir.dot(f.dir), -1, 1));
+    const t = 1 - ang/f.r;
+    if(t > 0){
+      const cone   = Math.pow(t, 1.4);
+      const crater = t > 0.75 ? Math.pow((t-0.75)/0.25, 2) * 0.55 : 0;
+      R += f.h * (cone - crater);
+    }
+  }
+  return R;
+}
+/* normalised 0..1 height, used for colouring / prop placement rules */
+function terrainT(p, dir){
+  return clamp((terrainRadius(p,dir) - p.radius) / p.biome.amp * 0.5 + 0.5, 0, 1);
+}
+
+/* drifting cloud layer: alpha texture, seamless in longitude */
+function makeCloudTexture(noise, seed){
+  const W=512, H=256;
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d');
+  const img=ctx.createImageData(W,H);
+  for(let y=0;y<H;y++){
+    const lat=(y/H-0.5)*Math.PI;
+    for(let x=0;x<W;x++){
+      const a=x/W*Math.PI*2;
+      const nx=Math.cos(a)*Math.cos(lat), ny=Math.sin(lat), nz=Math.sin(a)*Math.cos(lat);
+      let n=noise.fbm(nx*3.5+seed, ny*3.5+seed*2, nz*3.5+seed, 4);
+      n = clamp((n+0.05)*1.6, 0, 1); n*=n;   // raise the +0.05 for denser cloud cover
+      const i=(y*W+x)*4;
+      img.data[i]=img.data[i+1]=img.data[i+2]=255;
+      img.data[i+3]=n*255;
+    }
+  }
+  ctx.putImageData(img,0,0);
+  ctx.filter='blur(2px)';        // soften the texel grid seen from the surface
+  ctx.drawImage(cv,0,0);
+  ctx.filter='none';
+  return new THREE.CanvasTexture(cv);
+}
+
+/* atmosphere rim-glow: fresnel shader on a bigger back-side sphere.
+   uFade lets us hide other planets' halos while we're inside an atmosphere. */
+function makeAtmosphere(radius, colorHex){
+  const mat = new THREE.ShaderMaterial({
+    uniforms:{ uColor:{ value:new THREE.Color(colorHex) }, uFade:{ value:1 } },
+    vertexShader:`
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        vN = normalize(normalMatrix * normal);
+        vec4 mv = modelViewMatrix * vec4(position,1.0);
+        vV = mv.xyz;
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader:`
+      uniform vec3 uColor; uniform float uFade; varying vec3 vN; varying vec3 vV;
+      void main(){
+        float rim = pow(1.0 - abs(dot(normalize(vN), normalize(-vV))), 3.0);
+        gl_FragColor = vec4(uColor, rim * 0.9 * uFade);
+      }`,
+    side:THREE.BackSide, transparent:true, depthWrite:false,
+    blending:THREE.AdditiveBlending, fog:false,
+  });
+  const m = new THREE.Mesh(new THREE.SphereGeometry(radius,48,24), mat);
+  m.renderOrder = 3;
+  return m;
+}
+
+/* ---------- prop geometry builders (low-poly, vertex-coloured) ---------- */
+function paintGeometry(geo, hex){
+  const n = geo.attributes.position.count;
+  const col = new Float32Array(n*3);
+  const c = new THREE.Color(hex);
+  for(let i=0;i<n;i++){ col[i*3]=c.r; col[i*3+1]=c.g; col[i*3+2]=c.b; }
+  geo.setAttribute('color', new THREE.BufferAttribute(col,3));
+  return geo;
+}
+// parts: [[geometry, colorHex, y-offset], ...] merged into one paintable geometry
+function mergePainted(parts){
+  const gs = parts.map(([g,hex,dy])=>{
+    g.translate(0,dy,0);
+    return paintGeometry(g.toNonIndexed(), hex);
+  });
+  return BufferGeometryUtils.mergeGeometries(gs);
+}
+const PROP_GEOS = {
+  pine : ()=> mergePainted([          // snow-dusted conifer
+    [new THREE.CylinderGeometry(0.28,0.4,1.6,5), 0x5a3d28, 0.8],
+    [new THREE.ConeGeometry(1.9,3.0,6), 0x2f5e46, 2.8],
+    [new THREE.ConeGeometry(1.4,2.4,6), 0x3c7256, 4.4],
+    [new THREE.ConeGeometry(0.9,1.8,6), 0xe8f4fa, 5.8],
+  ]),
+  leafy: ()=> mergePainted([          // round lush tree
+    [new THREE.CylinderGeometry(0.3,0.45,2.4,5), 0x6b4a30, 1.2],
+    [new THREE.IcosahedronGeometry(2.0,0), 0x3f8a3c, 4.0],
+    [new THREE.IcosahedronGeometry(1.3,0), 0x59a344, 5.4],
+  ]),
+  palm : ()=> mergePainted([          // beachy island tree
+    [new THREE.CylinderGeometry(0.22,0.4,3.4,5), 0x8a6a45, 1.7],
+    [new THREE.IcosahedronGeometry(1.5,0), 0x3f9e4e, 3.9],
+  ]),
+  tall : ()=> mergePainted([          // tall canopy tree, lush forests
+    [new THREE.CylinderGeometry(0.22,0.35,4.2,5), 0x6b4a30, 2.1],
+    [new THREE.IcosahedronGeometry(1.5,0), 0x2f7e46, 4.9],
+    [new THREE.IcosahedronGeometry(1.0,0), 0x49a352, 6.2],
+  ]),
+  spike: ()=> mergePainted([          // basalt spire, volcanic
+    [new THREE.ConeGeometry(1.1,4.5,5), 0x241a18, 2.2],
+    [new THREE.ConeGeometry(0.5,2.0,4), 0x552211, 4.6],
+  ]),
+  crystal: ()=> mergePainted([        // ice shards, glacial
+    [new THREE.OctahedronGeometry(0.8,0).scale(1,3.2,1), 0xbdf0ff, 1.8],
+    [new THREE.OctahedronGeometry(0.5,0).scale(1,2.4,1).translate(0.9,0,0.4), 0x8fd8f4, 1.0],
+  ]),
+  rock : (hex=0x6e6862)=> mergePainted([[new THREE.IcosahedronGeometry(1.4,0), hex, 0.6]]),
+};
+
+/* scatter an instanced prop mesh across a planet's surface */
+function scatterProps(p, geo, count, opts={}){
+  const mat = new THREE.MeshStandardMaterial({
+    vertexColors:true, flatShading:true, roughness:0.95, metalness:0.0,
+    emissive: new THREE.Color(opts.emissive||0x000000),
+    emissiveIntensity: opts.emissiveIntensity||0,
+  });
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  mesh.frustumCulled = false; // instances span the whole planet
+  const dummy = new THREE.Object3D();
+  let placed = 0, tries = 0;
+  while(placed < count && tries < count*30){
+    tries++;
+    const z = p.rand()*2-1, a = p.rand()*Math.PI*2, r = Math.sqrt(1-z*z);
+    _v1.set(r*Math.cos(a), z, r*Math.sin(a));
+    const t = terrainT(p, _v1);
+    if(opts.minT!==undefined && t<opts.minT) continue;
+    if(opts.maxT!==undefined && t>opts.maxT) continue;
+    const surfR = terrainRadius(p,_v1);
+    if(p.waterR && surfR < p.waterR + 2) continue; // stay out of the sea
+    dummy.position.copy(_v1).multiplyScalar(surfR - 0.3);
+    dummy.quaternion.setFromUnitVectors(UP, _v1);
+    dummy.rotateY(p.rand()*Math.PI*2);
+    dummy.scale.setScalar((opts.minScale||0.8) + p.rand()*((opts.maxScale||1.6)-(opts.minScale||0.8)));
+    dummy.updateMatrix();
+    mesh.setMatrixAt(placed, dummy.matrix);
+    placed++;
+  }
+  mesh.count = placed;
+  p.group.add(mesh);
+}
+
+function createPlanet(index, biomeKey, center){
+  const seed = (SEED ^ Math.imul(index+1, 0x9e3779b9)) >>> 0;
+  const prand = mulberry32(seed);
+  const p = {
+    index, biomeKey,
+    biome: BIOMES[biomeKey],
+    rand: prand,
+    noise: new Simplex3(mulberry32(seed ^ 0xabcdef)),
+    noiseOffset: prand()*40,
+    radius: lerp(CONFIG.PLANET_RADIUS[0], CONFIG.PLANET_RADIUS[1], prand()),
+    center: center.clone(),
+    gravity: 0.55 + prand()*1.25,   // in g — shown on the HUD, used on foot
+    name: makeWord(prand) + ' ' + NAME.planetSuffix[(prand()*NAME.planetSuffix.length)|0],
+    group: new THREE.Group(),
+  };
+  p.atmoHeight = p.radius * 0.5;    // altitude where "space" begins
+  p.group.position.copy(center);
+
+  /* volcanic worlds get real volcanoes: cone-with-crater bumps mixed into
+     the height field (see terrainRadius) + a glowing lava disc per caldera */
+  if(biomeKey==='VOLCANIC'){
+    p.features = [];
+    const n = 5 + ((prand()*3)|0);
+    for(let i=0;i<n;i++){
+      const z=prand()*2-1, a=prand()*Math.PI*2, r=Math.sqrt(1-z*z);
+      p.features.push({
+        dir: new THREE.Vector3(r*Math.cos(a), z, r*Math.sin(a)),
+        r: 0.10 + prand()*0.10,   // angular footprint (radians)
+        h: 130 + prand()*120,     // peak height above local terrain (m)
+      });
     }
   }
 
-  recomputeHeight();
-  displayHeight += (height - displayHeight)*Math.min(1, dt*8);
+  // absolute sea-level radius, if the biome has an ocean
+  p.waterR = p.biome.water!=null ? p.radius + (p.biome.water*2-1)*p.biome.amp : 0;
 
-  // ---- spawn next ----
-  if(!active && !controlled && state==='playing'){
-    spawnDelay -= dt;
-    if(spawnDelay<=0) spawnControlled();
+  /* ----- terrain: displaced icosphere with per-face colours ----- */
+  const detail = Math.round(clamp(p.radius/22, 40, 60));
+  const geo = new THREE.IcosahedronGeometry(1, detail); // non-indexed
+  const posAttr = geo.attributes.position;
+  const nVerts = posAttr.count;
+  const colors = new Float32Array(nVerts*3);
+  const col = new THREE.Color();
+  const cliffCol = new THREE.Color(p.biome.cliff ?? 0x6b5f4c);
+  const va=new THREE.Vector3(), vb=new THREE.Vector3(), vc=new THREE.Vector3(),
+        fn=new THREE.Vector3(), rad=new THREE.Vector3();
+  for(let f=0; f<nVerts; f+=3){          // per triangle
+    let tAvg = 0;
+    for(let k=0;k<3;k++){
+      _v1.fromBufferAttribute(posAttr, f+k).normalize();
+      const R = terrainRadius(p, _v1);
+      posAttr.setXYZ(f+k, _v1.x*R, _v1.y*R, _v1.z*R);
+      tAvg += clamp((R - p.radius)/(p.biome.amp*1.4)*0.5+0.5, 0, 1);
+    }
+    gradColor(p.biome.colors, tAvg/3, col);
+    // steep faces read as bare rock — makes mountain walls and canyon
+    // sides stand out from the height-gradient colouring
+    va.fromBufferAttribute(posAttr,f);
+    vb.fromBufferAttribute(posAttr,f+1);
+    vc.fromBufferAttribute(posAttr,f+2);
+    rad.copy(va).add(vb).add(vc).normalize();
+    vb.sub(va); vc.sub(va);
+    fn.crossVectors(vb,vc).normalize();
+    const slope = 1 - Math.abs(fn.dot(rad));   // 0 = level, 1 = vertical
+    col.lerp(cliffCol, smoothstep(clamp((slope-0.45)/0.35, 0, 1)) * 0.85);
+    const jitter = 0.94 + p.rand()*0.1;  // subtle per-face tonal variation
+    for(let k=0;k<3;k++){
+      colors[(f+k)*3  ]=col.r*jitter;
+      colors[(f+k)*3+1]=col.g*jitter;
+      colors[(f+k)*3+2]=col.b*jitter;
+    }
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  geo.computeVertexNormals();
+  const terrainMat = new THREE.MeshStandardMaterial({
+    vertexColors:true, flatShading:true, roughness:1.0, metalness:0.0,
+  });
+  if(biomeKey==='VOLCANIC'){ // lava glow from the lowlands
+    terrainMat.emissive = new THREE.Color(0x661200);
+    terrainMat.emissiveIntensity = 0.35;
+  }
+  p.group.add(new THREE.Mesh(geo, terrainMat));
+
+  /* ----- ocean sphere ----- */
+  if(p.waterR){
+    const water = new THREE.Mesh(
+      new THREE.SphereGeometry(p.waterR, 96, 48),
+      new THREE.MeshStandardMaterial({
+        color: p.biome.waterColor||0x1566aa, transparent:true, opacity:0.78,
+        roughness:0.42, metalness:0.0,
+      })
+    );
+    water.renderOrder = 1;
+    p.group.add(water);
   }
 
-  // ---- score from height (continuous) ----
-  const heightScore = Math.floor(maxHeight*100);
-  if(heightScore>score) score = heightScore; // bonuses also add directly elsewhere
+  /* ----- drifting cloud layer ----- */
+  if(p.biome.cloudOpacity > 0.05){
+    p.clouds = new THREE.Mesh(
+      new THREE.SphereGeometry(p.radius + p.biome.amp + p.atmoHeight*0.22, 48, 24),
+      new THREE.MeshLambertMaterial({
+        color:p.biome.cloud, alphaMap:makeCloudTexture(p.noise, p.noiseOffset),
+        transparent:true, opacity:p.biome.cloudOpacity,
+        side:THREE.DoubleSide, depthWrite:false,
+        emissive:p.biome.cloud, emissiveIntensity:0.04,
+      })
+    );
+    p.clouds.renderOrder = 2;
+    p.cloudSpin = (prand()*0.5+0.4)*0.006 * (prand()>0.5?1:-1);
+    p.group.add(p.clouds);
+  }
 
-  // ---- stability / danger ----
-  evaluateDanger(dt);
+  /* ----- atmosphere rim glow ----- */
+  const atmoMesh = makeAtmosphere(p.radius + p.biome.amp + p.atmoHeight*0.35, p.biome.atmo);
+  p.atmoMat = atmoMesh.material;
+  p.group.add(atmoMesh);
 
-  // ---- clean landing check ----
-  evaluateCleanLanding(dt);
-
-  // ---- camera follows top of tower ----
-  updateCamera(dt);
-
-  // ---- fail conditions ----
-  checkFail();
-
-  updateHUD();
-}
-
-function onPieceLanded(body){
-  Sound.land();
-  // dust particles along the bottom edge of the piece
-  const c = body.plugin.color[0];
-  spawnParticles(body.position.x, body.bounds.max.y-6, c, 10, 4);
-  spawnDelay = Math.max(0.15, 0.55 - Math.min(maxHeight/30,1)*0.3); // faster as you climb
-  landingPending = true; stillTimer = 0;
-  // small shake on impact relative to fall speed
-  shake = Math.min(shake + Math.min(activeMaxSpeed*0.6, 6), 10);
-}
-
-function evaluateCleanLanding(dt){
-  if(!landingPending){ return; }
-  // everything must be essentially still for 2s
-  let maxSp = 0;
-  for(const b of settled){ if(b.speed>maxSp) maxSp=b.speed; if(b.angularSpeed*4>maxSp) maxSp=b.angularSpeed*4; }
-  if(active) maxSp = Math.max(maxSp, active.speed);
-  if(maxSp < 0.12){
-    stillTimer += dt;
-    if(stillTimer >= 2.0){
-      const bonus = 50 + Math.floor(maxHeight*10);
-      score += bonus;
-      popup('Clean Landing! +'+bonus, 'var(--good)');
-      Sound.clean();
-      // sparkle
-      const top = topAllSettled();
-      spawnParticles(W/2, top+20, '#5dffa0', 18, 5);
-      landingPending = false; stillTimer=0;
+  /* ----- props ----- */
+  const pr = p.biome.props;
+  if(pr.trees){
+    const emis = pr.trees==='spike' ? {emissive:0xff3300, emissiveIntensity:0.25} : {};
+    scatterProps(p, PROP_GEOS[pr.trees](), CONFIG.PROPS.trees,
+      { minT:0.35, maxT:0.8, minScale:0.9, maxScale:1.8, ...emis });
+  }
+  if(pr.rocks){
+    const rockHex = pr.rocks==='lava' ? 0x3a2a26 : pr.rocks==='round' ? 0x8a8378 : 0x6e6862;
+    const emis = pr.rocks==='lava' ? {emissive:0xff4400, emissiveIntensity:0.35} : {};
+    scatterProps(p, PROP_GEOS.rock(rockHex), CONFIG.PROPS.rocks,
+      { minScale:0.6, maxScale:2.6, ...emis });
+  }
+  // biome signatures: a second tree species on lush worlds, glowing ice
+  // shards on glacial worlds, molten calderas on volcanic worlds
+  if(biomeKey==='LUSH')
+    scatterProps(p, PROP_GEOS.tall(), 340, { minT:0.36, maxT:0.75, minScale:0.9, maxScale:1.7 });
+  if(biomeKey==='GLACIAL')
+    scatterProps(p, PROP_GEOS.crystal(), 90,
+      { minScale:0.7, maxScale:2.2, emissive:0x66d8ff, emissiveIntensity:0.35 });
+  if(p.features){
+    for(const f of p.features){
+      const lava = new THREE.Mesh(
+        new THREE.CylinderGeometry(f.r*p.radius*0.26, f.r*p.radius*0.26, 2, 10),
+        new THREE.MeshBasicMaterial({ color:0xff5a1e })
+      );
+      // a lava lake partway up the crater bowl, clipping into the walls
+      lava.position.copy(f.dir).multiplyScalar(terrainRadius(p, f.dir) + f.h*0.10);
+      lava.quaternion.setFromUnitVectors(UP, f.dir);
+      p.group.add(lava);
     }
+  }
+
+  scene.add(p.group);
+  return p;
+}
+
+function initUniverse(){
+  systemName = makeWord(rng) + ' ' + (['Prime','Major','Reach','Expanse'][(rng()*4)|0]);
+
+  // one of each biome first, then random extras; shuffled so the
+  // starting planet's biome varies from seed to seed
+  const biomeKeys = Object.keys(BIOMES);
+  const picks = [];
+  for(let i=0;i<CONFIG.PLANET_COUNT;i++)
+    picks.push(i<biomeKeys.length ? biomeKeys[i] : biomeKeys[(rng()*biomeKeys.length)|0]);
+  for(let i=picks.length-1;i>0;i--){ const j=(rng()*(i+1))|0; [picks[i],picks[j]]=[picks[j],picks[i]]; }
+
+  // scatter on a loose ecliptic, keeping planets well apart
+  const centers = [];
+  for(let i=0;i<picks.length;i++){
+    let c=null, tries=0;
+    while(tries<200){
+      tries++;
+      const a = rng()*Math.PI*2;
+      const d = 7000 + rng()*(CONFIG.SYSTEM_RADIUS-7000);
+      c = new THREE.Vector3(Math.cos(a)*d, (rng()-0.5)*5000, Math.sin(a)*d);
+      if(centers.every(o=>o.distanceTo(c) > 7000)) break;
+    }
+    centers.push(c);
+    planets.push(createPlanet(i, picks[i], c));
+  }
+}
+
+/* nearest planet + altitude above its surface (terrain or ocean) */
+function nearestPlanet(pos){
+  let best=null, bestAlt=Infinity;
+  for(const p of planets){
+    _v1.copy(pos).sub(p.center);
+    const d=_v1.length();
+    _v1.divideScalar(d);
+    const alt = d - Math.max(terrainRadius(p,_v1), p.waterR||0);
+    if(alt<bestAlt){ bestAlt=alt; best=p; }
+  }
+  return { planet:best, alt:bestAlt };
+}
+
+/* ==================================================================
+   THE SHIP — low-poly hero model + arcade flight
+   ================================================================== */
+/* ---------- shared ship-building helpers ---------- */
+function shipMats(hullHex, darkHex, glowHex){
+  return {
+    hull: new THREE.MeshStandardMaterial({ color:hullHex, flatShading:true, metalness:0.65, roughness:0.35 }),
+    dark: new THREE.MeshStandardMaterial({ color:darkHex, flatShading:true, metalness:0.5, roughness:0.5 }),
+    canopy: new THREE.MeshStandardMaterial({ color:0x1a3a4a, emissive:glowHex, emissiveIntensity:0.55, roughness:0.15, metalness:0.6 }),
+    glow: glowHex,
+  };
+}
+function addEngine(grp, m, x, y, z, r){
+  const e = new THREE.Mesh(new THREE.CylinderGeometry(r*0.82, r, r*2.6, 6), m.dark);
+  e.rotation.x = -Math.PI/2; e.position.set(x,y,z); grp.add(e);
+  const f = new THREE.Mesh(new THREE.ConeGeometry(r*0.7, 1.8, 8),
+    new THREE.MeshBasicMaterial({ color:m.glow, transparent:true, opacity:0.9 }));
+  f.rotation.x = Math.PI/2; f.position.set(x,y,z+r*2.2); grp.add(f);
+  grp.engFlame.push(f);
+}
+function addCanopy(grp, m, y, z, len=1.6){
+  const c = new THREE.Mesh(new THREE.SphereGeometry(0.72,10,8), m.canopy);
+  c.scale.set(1,0.62,len); c.position.set(0,y,z); grp.add(c);
+}
+
+/* WAYFARER — boxy hauler: slow, stable, amber engines */
+function buildWayfarer(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0xb0a494, 0x3a3630, 0xffb35c);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(3.2,2.0,7.2), m.hull); grp.add(body);
+  const cab  = new THREE.Mesh(new THREE.BoxGeometry(2.0,1.1,1.8), m.dark);
+  cab.position.set(0,1.35,-2.2); grp.add(cab);
+  addCanopy(grp, m, 1.6, -2.6, 1.1);
+  for(const sx of [-1,1]){
+    const pod = new THREE.Mesh(new THREE.BoxGeometry(1.1,1.1,4.6), m.dark);
+    pod.position.set(sx*2.1,-0.4,0.6); grp.add(pod);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(1.6,0.16,2.6), m.hull);
+    wing.position.set(sx*3.2,0.2,1.2); grp.add(wing);
+    addEngine(grp, m, sx*1.2,  0.55, 3.8, 0.55);
+    addEngine(grp, m, sx*1.2, -0.55, 3.8, 0.55);
+  }
+  return grp;
+}
+
+/* STARFALL — the original explorer: balanced, cyan engines */
+function buildStarfall(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0xaab4c4, 0x2a3140, 0x6fd8ff);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.35,6.4,6), m.hull);
+  body.rotation.x = -Math.PI/2; grp.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.92,2.6,6), m.hull);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -4.4; grp.add(nose);
+  addCanopy(grp, m, 0.75, -1.4);
+  const wingGeo = new THREE.BoxGeometry(4.4,0.16,2.2);
+  const wl = new THREE.Mesh(wingGeo, m.dark); wl.position.set(-2.8,-0.15,1.4); wl.rotation.set(0,0.28,0.1);  grp.add(wl);
+  const wr = new THREE.Mesh(wingGeo, m.dark); wr.position.set( 2.8,-0.15,1.4); wr.rotation.set(0,-0.28,-0.1); grp.add(wr);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.14,1.5,1.6), m.dark);
+  fin.position.set(0,0.95,2.4); grp.add(fin);
+  addEngine(grp, m, -1.5,-0.1, 3.1, 0.56);
+  addEngine(grp, m,  1.5,-0.1, 3.1, 0.56);
+  return grp;
+}
+
+/* VIPER — swept-wing fighter: quick, orange afterburners */
+function buildViper(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0xc4b4b8, 0x4a1e26, 0xff8844);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.65,1.05,6.0,6), m.hull);
+  body.rotation.x = -Math.PI/2; grp.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.68,3.2,6), m.hull);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -4.6; grp.add(nose);
+  addCanopy(grp, m, 0.6, -1.6, 1.8);
+  const wingGeo = new THREE.BoxGeometry(5.6,0.12,1.7);
+  const wl = new THREE.Mesh(wingGeo, m.dark); wl.position.set(-3.0,0,1.8); wl.rotation.set(0, 0.55, 0.05); grp.add(wl);
+  const wr = new THREE.Mesh(wingGeo, m.dark); wr.position.set( 3.0,0,1.8); wr.rotation.set(0,-0.55,-0.05); grp.add(wr);
+  for(const sx of [-1,1]){
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12,1.6,1.4), m.dark);
+    fin.position.set(sx*0.7,1.0,2.6); fin.rotation.z = sx*-0.5; grp.add(fin);
+  }
+  addEngine(grp, m, -0.85,0, 3.1, 0.5);
+  addEngine(grp, m,  0.85,0, 3.1, 0.5);
+  return grp;
+}
+
+/* PHANTOM — needle interceptor: fastest, violet drive */
+function buildPhantom(){
+  const grp = new THREE.Group(); grp.engFlame = [];
+  const m = shipMats(0x50556a, 0x23242e, 0xb07fff);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45,0.85,7.4,6), m.hull);
+  body.rotation.x = -Math.PI/2; grp.add(body);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.47,3.6,6), m.hull);
+  nose.rotation.x = -Math.PI/2; nose.position.z = -5.5; grp.add(nose);
+  addCanopy(grp, m, 0.45, -2.2, 2.2);
+  for(const sx of [-1,1]){
+    const canard = new THREE.Mesh(new THREE.BoxGeometry(1.8,0.1,0.9), m.dark);
+    canard.position.set(sx*1.0,0,-2.6); canard.rotation.set(0,sx*-0.3,sx*-0.15); grp.add(canard);
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(3.4,0.12,1.9), m.dark);
+    blade.position.set(sx*1.8,-0.5,2.2); blade.rotation.set(0,sx*-0.4,sx*0.55); grp.add(blade);
+  }
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.12,1.8,1.8), m.dark);
+  fin.position.set(0,0.9,3.0); grp.add(fin);
+  addEngine(grp, m, 0, 0, 3.9, 0.75);
+  return grp;
+}
+
+/* swap the flown ship (works any time — pause with Esc and pick another) */
+function selectShip(i){
+  const def = SHIPS[i];
+  const mesh = def.build();
+  if(ship.mesh){
+    mesh.position.copy(ship.mesh.position);
+    mesh.quaternion.copy(ship.mesh.quaternion);
+    scene.remove(ship.mesh);
+  }
+  ship.def = def;
+  ship.index = i;
+  ship.mesh = mesh;
+  ship.engineLight.color.setHex(def.glow);
+  ship.mesh.add(ship.engineLight);   // re-parents the light onto the new hull
+  scene.add(ship.mesh);
+  try{ localStorage.setItem('starfall-ship', i); }catch(e){}
+  document.querySelectorAll('.ship-card').forEach((c,ci)=>c.classList.toggle('sel', ci===i));
+}
+
+function initShip(){
+  ship = {
+    mesh: null, def: null, index: 1,
+    pos: new THREE.Vector3(),
+    quat: new THREE.Quaternion(),
+    speed: 0,
+    throttle: 0,
+    bank: 0,
+    engineLight: new THREE.PointLight(0x66ccff, 0, 60, 2),
+  };
+  ship.engineLight.position.set(0,0,4);
+  let start = 1; // default to the STARFALL explorer
+  try{
+    const saved = parseInt(localStorage.getItem('starfall-ship'),10);
+    if(Number.isFinite(saved)) start = clamp(saved, 0, SHIPS.length-1);
+  }catch(e){}
+  selectShip(start);
+
+  // start in orbit above the first planet's SUNLIT side, nose pointed at it
+  const p0 = planets[0];
+  _v1.copy(p0.center).multiplyScalar(-1).normalize();   // toward the sun
+  _v2.crossVectors(_v1, UP).normalize();                // sideways offset for a nicer angle
+  _v1.addScaledVector(_v2, 0.55).addScaledVector(UP, 0.3).normalize();
+  ship.pos.copy(p0.center).addScaledVector(_v1, p0.radius*3.2);
+  _m1.lookAt(ship.pos, p0.center, UP);
+  ship.quat.setFromRotationMatrix(_m1);
+  ship.mesh.position.copy(ship.pos);
+  ship.mesh.quaternion.copy(ship.quat);
+}
+
+function updateShip(dt){
+  const S = ship.def.stats;
+
+  // ---- steering: mouse OR arrow keys = pitch/yaw, A/D = roll ----
+  // arrows are folded into the mouse deltas (≈600 mouse-px per second),
+  // so each ship's TURN_SENS shapes both input methods the same way
+  const AP = 600*dt;
+  if(keys['ArrowLeft'])  mouseDX -= AP;
+  if(keys['ArrowRight']) mouseDX += AP;
+  if(keys['ArrowUp'])    mouseDY += AP;  // inverted flight-stick: up = nose down
+  if(keys['ArrowDown'])  mouseDY -= AP;
+  const yaw   = -mouseDX * S.TURN_SENS;
+  const pitch = -mouseDY * S.TURN_SENS;
+  mouseDX = mouseDY = 0;
+  _q1.setFromAxisAngle(UP, yaw);        ship.quat.multiply(_q1);
+  _q1.setFromAxisAngle(X_AXIS, pitch);  ship.quat.multiply(_q1);
+  let roll = 0;
+  if(keys['KeyA']) roll += S.ROLL_SPEED*dt;
+  if(keys['KeyD']) roll -= S.ROLL_SPEED*dt;
+  _q1.setFromAxisAngle(Z_AXIS, roll);   ship.quat.multiply(_q1);
+  ship.quat.normalize();
+  ship.bank = lerp(ship.bank, clamp(-yaw*45, -0.6, 0.6), 1-Math.exp(-6*dt)); // cosmetic banking
+
+  // ---- throttle / speed ----
+  if(keys['KeyW']) ship.throttle = clamp(ship.throttle + dt*0.8, -0.15, 1);
+  if(keys['KeyS']) ship.throttle = clamp(ship.throttle - dt*0.8, -0.15, 1);
+  const boosting = keys['Space'] && ship.throttle > 0.05;
+  const near = nearestPlanet(ship.pos);
+  const inAtmo = near.alt < near.planet.atmoHeight;
+  let target = ship.throttle * S.MAX_SPEED * (boosting ? S.BOOST_MULT : 1);
+  if(inAtmo) target = clamp(target, -S.ATMO_CAP*0.2, S.ATMO_CAP);
+  ship.speed = lerp(ship.speed, target, 1-Math.exp(-S.ACCEL*dt));
+
+  // ---- integrate ----
+  _v1.copy(FWD).applyQuaternion(ship.quat);
+  ship.pos.addScaledVector(_v1, ship.speed*dt);
+
+  // ---- ground/ocean collision: hold the hull ~2.2 m above the surface ----
+  const p = near.planet;
+  _v2.copy(ship.pos).sub(p.center);
+  const d = _v2.length(); _v2.divideScalar(d);
+  const surf = Math.max(terrainRadius(p,_v2), p.waterR||0);
+  if(d < surf + 2.2){
+    ship.pos.copy(p.center).addScaledVector(_v2, surf + 2.2);
+    ship.speed *= Math.pow(0.5, dt*4); // scrubbing along the ground bleeds speed
+  }
+  // and keep out of the sun
+  const sunD = ship.pos.length();
+  if(sunD < 1600) ship.pos.multiplyScalar(1600/sunD);
+
+  // ---- visuals ----
+  ship.mesh.position.copy(ship.pos);
+  _q1.setFromAxisAngle(Z_AXIS, ship.bank);
+  ship.mesh.quaternion.copy(ship.quat).multiply(_q1);
+  const thrust = clamp(Math.abs(ship.speed)/S.MAX_SPEED, 0, 2);
+  for(const f of ship.mesh.engFlame){
+    f.scale.set(1, 0.4 + thrust*(boosting?2.2:1.2) + Math.random()*0.15, 1);
+    f.material.opacity = 0.25 + 0.6*clamp(thrust,0,1);
+  }
+  ship.engineLight.intensity = thrust * (boosting?26:12);
+
+  // ---- chase camera target ----
+  _v3.fromArray(ship.def.camOffset).applyQuaternion(ship.quat);
+  camTargetPos.copy(ship.pos).add(_v3);
+  _v1.copy(FWD).applyQuaternion(ship.quat);
+  _v2.copy(ship.pos).addScaledVector(_v1, 30);
+  _v3.copy(UP).applyQuaternion(ship.quat);
+  _m1.lookAt(camTargetPos, _v2, _v3);
+  camTargetQuat.setFromRotationMatrix(_m1);
+
+  // boost FOV kick
+  camera.fov = lerp(camera.fov, boosting ? 82 : 70, 1-Math.exp(-4*dt));
+  camera.updateProjectionMatrix();
+
+  return near;
+}
+
+/* ==================================================================
+   ON FOOT — first/third person walking on a sphere
+   ================================================================== */
+function buildPlayerMesh(){
+  const grp = new THREE.Group();
+  const suit = new THREE.MeshStandardMaterial({ color:0xc8cdd6, flatShading:true, roughness:0.6, metalness:0.2 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32,0.75,4,8), suit);
+  body.position.y = 0.95; grp.add(body);
+  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.26,10,8),
+    new THREE.MeshStandardMaterial({ color:0x223344, roughness:0.2, metalness:0.7 }));
+  helmet.position.y = 1.62; grp.add(helmet);
+  const pack = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.5,0.22), suit);
+  pack.position.set(0,1.15,0.3); grp.add(pack);
+  return grp;
+}
+
+function initPlayer(){
+  player = {
+    pos: new THREE.Vector3(),      // EYE position
+    vel: new THREE.Vector3(),
+    quat: new THREE.Quaternion(),  // upright body orientation (up-aligned + yaw)
+    pitch: 0,
+    grounded: false,
+    thirdPerson: false,
+    planet: null,
+    mesh: buildPlayerMesh(),
+  };
+  player.mesh.visible = false;
+  scene.add(player.mesh);
+}
+
+function updatePlayer(dt){
+  const F = CONFIG.FOOT;
+  const p = player.planet;
+  const up = _v1.copy(player.pos).sub(p.center).normalize();
+
+  // arrow keys look around on foot too (same path as the mouse)
+  const AP = 500*dt;
+  if(keys['ArrowLeft'])  mouseDX -= AP;
+  if(keys['ArrowRight']) mouseDX += AP;
+  if(keys['ArrowUp'])    mouseDY -= AP;
+  if(keys['ArrowDown'])  mouseDY += AP;
+
+  // --- keep the body frame aligned to local up, then apply mouse yaw ---
+  _v2.copy(UP).applyQuaternion(player.quat);
+  _q1.setFromUnitVectors(_v2, up);
+  player.quat.premultiply(_q1);
+  _q1.setFromAxisAngle(up, -mouseDX*F.LOOK_SENS);
+  player.quat.premultiply(_q1).normalize();
+  player.pitch = clamp(player.pitch - mouseDY*F.LOOK_SENS, -1.45, 1.45);
+  mouseDX = mouseDY = 0;
+
+  // --- movement input in the tangent frame ---
+  const fwd   = _v2.copy(FWD).applyQuaternion(player.quat);
+  const right = _v3.copy(X_AXIS).applyQuaternion(player.quat);
+  const wish  = _v4.set(0,0,0);
+  if(keys['KeyW']) wish.add(fwd);
+  if(keys['KeyS']) wish.sub(fwd);
+  if(keys['KeyD']) wish.add(right);
+  if(keys['KeyA']) wish.sub(right);
+  const speed = F.WALK_SPEED * (keys['ShiftLeft']||keys['ShiftRight'] ? F.SPRINT_MULT : 1);
+  if(wish.lengthSq()>0) wish.normalize().multiplyScalar(speed);
+
+  // split velocity into vertical + horizontal, steer the horizontal part
+  const g = 9.81 * p.gravity;
+  const vVert = up.dot(player.vel);
+  player.vel.addScaledVector(up, -vVert); // now horizontal only
+  player.vel.lerp(wish, 1-Math.exp(-(player.grounded?12:2.5)*dt));
+  player.vel.addScaledVector(up, vVert - g*dt);
+
+  if(keys['Space'] && player.grounded){
+    player.vel.addScaledVector(up, Math.sqrt(2*g*F.JUMP_HEIGHT));
+    player.grounded = false;
+  }
+
+  player.pos.addScaledVector(player.vel, dt);
+
+  // --- ground clamp (terrain, or tread water near the sea surface) ---
+  _v2.copy(player.pos).sub(p.center);
+  const d=_v2.length(); _v2.divideScalar(d);
+  let groundR = terrainRadius(p,_v2);
+  if(p.waterR) groundR = Math.max(groundR, p.waterR - 0.9);
+  const minR = groundR + F.EYE_HEIGHT;
+  player.grounded = false;
+  if(d <= minR + 0.02){
+    player.pos.copy(p.center).addScaledVector(_v2, minR);
+    const vv = up.dot(player.vel);
+    if(vv<0) player.vel.addScaledVector(up, -vv);
+    player.grounded = true;
+  }
+
+  // --- body mesh (visible in third person) ---
+  player.mesh.position.copy(player.pos).addScaledVector(up, -F.EYE_HEIGHT);
+  player.mesh.quaternion.copy(player.quat);
+  player.mesh.visible = player.thirdPerson;
+
+  // --- camera target ---
+  _q1.setFromAxisAngle(X_AXIS, player.pitch);
+  camTargetQuat.copy(player.quat).multiply(_q1);
+  if(player.thirdPerson){
+    _v2.copy(FWD).applyQuaternion(camTargetQuat);
+    camTargetPos.copy(player.pos).addScaledVector(_v2,-4.6).addScaledVector(up,0.7);
   } else {
-    stillTimer = 0;
-    // if it's moving a lot well after landing, the pending clean is lost but keep watching
+    camTargetPos.copy(player.pos);
+  }
+  camera.fov = lerp(camera.fov, 70, 1-Math.exp(-4*dt));
+  camera.updateProjectionMatrix();
+}
+
+/* ==================================================================
+   MODE TRANSITIONS (fly → land → walk → board → fly)
+   ================================================================== */
+function startCameraBlend(dur=0.7){
+  camBlend.active = true; camBlend.t = 0; camBlend.dur = dur;
+  camBlend.fromPos.copy(camera.position);
+  camBlend.fromQuat.copy(camera.quaternion);
+}
+
+/* may we set down here? low + slow + not over open ocean */
+function landingCheck(near){
+  if(near.alt >= CONFIG.LAND_MAX_ALT || Math.abs(ship.speed) >= CONFIG.LAND_MAX_SPEED) return false;
+  const p = near.planet;
+  if(!p.waterR) return true;
+  _v1.copy(ship.pos).sub(p.center).normalize();
+  return terrainRadius(p,_v1) > p.waterR - 0.5;
+}
+
+function tryInteract(){
+  if(mode==='STARSHIP'){
+    const near = nearestPlanet(ship.pos);
+    if(landingCheck(near)){
+      const p = near.planet;
+      _v1.copy(ship.pos).sub(p.center).normalize();
+      const groundR = Math.max(terrainRadius(p,_v1), p.waterR||0);
+      landing.fromPos.copy(ship.pos);
+      landing.fromQuat.copy(ship.quat);
+      landing.toPos.copy(p.center).addScaledVector(_v1, groundR + 1.7);
+      // level out: current forward projected onto the ground plane
+      _v2.copy(FWD).applyQuaternion(ship.quat);
+      _v2.addScaledVector(_v1, -_v1.dot(_v2));
+      if(_v2.lengthSq()<1e-4) _v2.crossVectors(_v1, X_AXIS);
+      _v2.normalize();
+      _m1.lookAt(_v3.set(0,0,0), _v2, _v1);
+      landing.toQuat.setFromRotationMatrix(_m1);
+      landing.t = 0;
+      landing.planet = p;
+      ship.speed = 0; ship.throttle = 0;
+      mode = 'LANDING';
+    }
+  } else if(mode==='FOOT'){
+    if(player.pos.distanceTo(ship.pos) < 8){
+      mode = 'STARSHIP';
+      ship.speed = 0; ship.throttle = 0;
+      player.mesh.visible = false;
+      startCameraBlend(0.8);
+    }
   }
 }
 
-function evaluateDanger(dt){
-  let maxSp=0, maxTilt=0;
-  for(const b of settled){
-    if(b===active) continue;
-    if(b.speed>maxSp) maxSp=b.speed;
-    // tilt from nearest right angle
-    let a = b.angle % (Math.PI/2);
-    if(a>Math.PI/4) a-=Math.PI/2; if(a<-Math.PI/4) a+=Math.PI/2;
-    if(Math.abs(a)>maxTilt) maxTilt=Math.abs(a);
-  }
-  const swaying = maxSp>0.9;
-  const tilting = maxTilt>0.38 && maxHeight>3;
-  danger = (swaying || tilting) && maxHeight>2;
-  if(danger){
-    shake = Math.min(shake+ (swaying? maxSp*0.5:1.2), 9);
-    if(!dangerWasOn){ Sound.danger(); }
-  }
-  dangerWasOn = danger;
-}
+function updateLanding(dt){
+  landing.t = Math.min(1, landing.t + dt/landing.dur);
+  const e = smoothstep(landing.t);
+  ship.pos.lerpVectors(landing.fromPos, landing.toPos, e);
+  ship.quat.slerpQuaternions(landing.fromQuat, landing.toQuat, e);
+  ship.mesh.position.copy(ship.pos);
+  ship.mesh.quaternion.copy(ship.quat);
+  for(const f of ship.mesh.engFlame) f.material.opacity *= 0.95;
+  ship.engineLight.intensity *= 0.95;
 
-function updateCamera(dt){
-  const top = currentTop();
-  // Stay anchored to the ground (floor near the bottom of the screen) until
-  // the tower climbs high enough; then follow it upward, keeping the top of
-  // the stack comfortably below the top edge so the next piece is visible.
-  const ground = groundViewTop();
-  const follow = top - viewH*0.45;
-  targetViewTop = Math.min(ground, follow);
-  viewTop += (targetViewTop - viewTop)*Math.min(1, dt*3.2);
-}
+  // camera keeps chasing during the descent
+  _v3.fromArray(ship.def.camOffset).applyQuaternion(ship.quat);
+  camTargetPos.copy(ship.pos).add(_v3);
+  _v2.copy(UP).applyQuaternion(ship.quat);
+  _m1.lookAt(camTargetPos, ship.pos, _v2);
+  camTargetQuat.setFromRotationMatrix(_m1);
 
-function checkFail(){
-  // out of bounds (safety net) — fell past field
-  for(const b of settled){
-    if(b.position.y > FLOOR_Y + 260){ return gameOver('out'); }
-    if(b.position.x < -180 || b.position.x > W+180){ return gameOver('out'); }
-  }
-  // collapse: height drops sharply below the fail line after building up
-  if(maxHeight>5 && height < maxHeight - 2.6){
-    return gameOver('collapse');
+  if(landing.t>=1){
+    // touchdown — disembark beside the ship
+    const p = landing.planet;
+    _v2.copy(X_AXIS).applyQuaternion(ship.quat);
+    _v3.copy(ship.pos).addScaledVector(_v2, 5);
+    _v4.copy(_v3).sub(p.center).normalize();
+    const groundR = Math.max(terrainRadius(p,_v4), p.waterR ? p.waterR-0.9 : 0);
+    player.pos.copy(p.center).addScaledVector(_v4, groundR + CONFIG.FOOT.EYE_HEIGHT);
+    player.vel.set(0,0,0);
+    player.quat.copy(ship.quat);
+    player.pitch = 0;
+    player.planet = p;
+    mode = 'FOOT';
+    startCameraBlend(0.9);
   }
 }
 
-/* ======================================================================
-   RENDER
-   ====================================================================== */
-function roundRect(c,x,y,w,h,r){
-  c.beginPath();
-  c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r);
-  c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r); c.closePath();
-}
+/* ==================================================================
+   ATMOSPHERE / FOG / SKY BLENDING — the seamless-descent feel:
+   as altitude drops, fog closes in, the sky takes the biome's
+   colour and the stars wash out. No loading, no scene switch.
+   ================================================================== */
+const SPACE_BG = new THREE.Color(0x02030a);
+function updateAtmosphereFX(near){
+  const p = near.planet;
+  const alt = Math.max(0, near.alt);
+  let f = clamp(1 - alt/p.atmoHeight, 0, 1);  // 0 in space → 1 at the surface
+  f = smoothstep(f);
 
-function drawCell(c, color, glow){
-  const s = CELL, h = s/2;
-  const grad = c.createLinearGradient(-h,-h,h,h);
-  grad.addColorStop(0, color[0]);
-  grad.addColorStop(1, color[1]);
-  if(glow){ c.shadowColor=color[0]; c.shadowBlur=18; }
-  c.fillStyle = grad;
-  roundRect(c, -h+1.2, -h+1.2, s-2.4, s-2.4, 6);
-  c.fill();
-  c.shadowBlur=0;
-  // top highlight
-  c.fillStyle='rgba(255,255,255,0.22)';
-  roundRect(c, -h+4, -h+4, s-8, (s-8)*0.4, 4);
-  c.fill();
-  // inner border
-  c.strokeStyle='rgba(255,255,255,0.18)'; c.lineWidth=1;
-  roundRect(c, -h+1.2, -h+1.2, s-2.4, s-2.4, 6); c.stroke();
-}
+  // how sunlit is our patch of sky? (sun sits at the origin)
+  _v1.copy(camera.position).sub(p.center).normalize();
+  _v2.copy(p.center).multiplyScalar(-1).normalize();
+  const day = clamp(_v1.dot(_v2)*0.6+0.62, 0.04, 1);
 
-function drawPieceBody(c, body, glow){
-  c.save();
-  c.translate(body.position.x, body.position.y);
-  c.rotate(body.angle);
-  for(const o of body.plugin.offsets){
-    c.save(); c.translate(o.x, o.y); drawCell(c, body.plugin.color, glow); c.restore();
-  }
-  c.restore();
-}
+  _c1.setHex(p.biome.fog).multiplyScalar(day);
+  _c2.copy(SPACE_BG).lerp(_c1, f);
+  scene.background.copy(_c2);
+  scene.fog.color.copy(_c2);
 
-function drawControlled(c){
-  if(!controlled) return;
-  const cc = controlled;
-  // drop trajectory guide
-  c.save();
-  c.globalAlpha=0.16;
-  c.fillStyle = cc.piece.color[0];
-  for(const o of cc.piece.offsets){
-    c.fillRect(cc.x+o.x-CELL/2+1, cc.y+o.y, CELL-2, FLOOR_Y - (cc.y+o.y));
-  }
-  c.restore();
-  // the piece itself, gently pulsing
-  c.save();
-  c.translate(cc.x, cc.y);
-  const pulse = 0.9 + Math.sin(performance.now()/300)*0.1;
-  c.globalAlpha = pulse;
-  for(const o of cc.piece.offsets){
-    c.save(); c.translate(o.x,o.y); drawCell(c, cc.piece.color, true); c.restore();
-  }
-  c.restore();
-}
+  const far = lerp(600000, 9500 + alt*5, f);  // fog closes in as we descend
+  scene.fog.near = far*0.16;
+  scene.fog.far  = far;
 
-function render(){
-  const c = ctx;
-  c.setTransform(DPR,0,0,DPR,0,0);
-  // ---- background (screen space) ----
-  const bg = c.createLinearGradient(0,0,0,cssH);
-  bg.addColorStop(0,'#0b1224'); bg.addColorStop(0.6,'#070a16'); bg.addColorStop(1,'#04060f');
-  c.fillStyle=bg; c.fillRect(0,0,cssW,cssH);
-
-  // shake offset
-  let sx=0, sy=0;
-  if(shake>0.2){ sx=rand(-shake,shake); sy=rand(-shake,shake); }
-
-  // ---- world transform ----
-  c.save();
-  // Base transform is already scaled by DPR, so shift/scale here in CSS-pixel
-  // space (multiplying by DPR again would double-apply the device ratio).
-  c.translate(sx, sy);
-  c.scale(scale, scale);
-  const offX = (viewW - W)/2;          // center the field horizontally
-  c.translate(offX, -viewTop);
-
-  // depth grid (moves with camera)
-  c.strokeStyle='rgba(94,231,255,0.05)'; c.lineWidth=1;
-  const gy0 = Math.floor(viewTop/CELL)*CELL;
-  for(let y=gy0; y<viewTop+viewH; y+=CELL){
-    c.beginPath(); c.moveTo(-offX, y); c.lineTo(W+offX, y); c.stroke();
-  }
-  for(let x=0; x<=W; x+=CELL){
-    c.beginPath(); c.moveTo(x, viewTop); c.lineTo(x, viewTop+viewH); c.stroke();
-  }
-
-  // ---- fail line (collapse threshold) ----
-  if(maxHeight>5){
-    const failY = FLOOR_Y - (maxHeight-2.6)*CELL;
-    c.save();
-    c.strokeStyle='rgba(255,77,109,0.55)'; c.lineWidth=2; c.setLineDash([10,8]);
-    c.beginPath(); c.moveTo(-offX, failY); c.lineTo(W+offX, failY); c.stroke();
-    c.setLineDash([]);
-    c.fillStyle='rgba(255,77,109,0.8)'; c.font='12px Segoe UI'; c.textAlign='left';
-    c.fillText('FAIL LINE', 4, failY-5);
-    c.restore();
-  }
-
-  // ---- walls & floor ----
-  c.save();
-  c.fillStyle='rgba(20,28,54,0.95)';
-  // left wall
-  c.fillRect(-WALL_T, viewTop-40, WALL_T, viewH+80);
-  // right wall
-  c.fillRect(W, viewTop-40, WALL_T, viewH+80);
-  // floor
-  const fg = c.createLinearGradient(0, FLOOR_Y, 0, FLOOR_Y+WALL_T);
-  fg.addColorStop(0,'#2a3a66'); fg.addColorStop(1,'#0d1430');
-  c.fillStyle=fg;
-  c.fillRect(-WALL_T, FLOOR_Y, W+WALL_T*2, WALL_T);
-  // glowing edges of walls/floor
-  c.strokeStyle='rgba(94,231,255,0.5)'; c.lineWidth=2; c.shadowColor='#5ee7ff'; c.shadowBlur=12;
-  c.beginPath(); c.moveTo(0,viewTop-40); c.lineTo(0,FLOOR_Y); c.lineTo(W,FLOOR_Y); c.lineTo(W,viewTop-40); c.stroke();
-  c.shadowBlur=0;
-  c.restore();
-
-  // ---- settled pieces ----
-  for(const b of settled){ if(b!==active) drawPieceBody(c, b, false); }
-  // ---- active falling piece (glowing) ----
-  if(active) drawPieceBody(c, active, true);
-  // ---- controlled piece ----
-  drawControlled(c);
-
-  // ---- particles ----
-  for(const p of particles){
-    c.globalAlpha = Math.max(0,p.life);
-    c.fillStyle = p.color;
-    c.beginPath(); c.arc(p.x,p.y,p.size,0,Math.PI*2); c.fill();
-  }
-  c.globalAlpha=1;
-
-  c.restore(); // end world transform
-
-  // ---- danger vignette (screen space) ----
-  if(danger){
-    const v = c.createRadialGradient(cssW/2,cssH/2, cssH*0.25, cssW/2,cssH/2, cssH*0.75);
-    const a = 0.35 + Math.sin(performance.now()/120)*0.15;
-    v.addColorStop(0,'rgba(255,40,80,0)');
-    v.addColorStop(1,'rgba(255,30,70,'+a.toFixed(3)+')');
-    c.fillStyle=v; c.fillRect(0,0,cssW,cssH);
+  // stars wash out in a bright daytime sky, linger through the night
+  starPoints.material.opacity = clamp(1 - f*day*1.15, 0.05, 1);
+  // fog-exempt glows must not punch through a thick atmosphere:
+  sunGlow.material.opacity = 1 - f*0.85;
+  for(const q of planets){
+    // other planets' halos hide behind our haze; our own planet's rim glow
+    // is an orbit effect — inside the atmosphere it would wash the whole
+    // view with additive colour, so hand off to fog as we descend
+    q.atmoMat.uniforms.uFade.value = q===p ? 1 - f*0.85 : 1-f;
+    // fade the cloud shell out as the camera sinks below it — seen from
+    // underneath at grazing angles it would otherwise read as a white wall
+    if(q.clouds){
+      const camR = camera.position.distanceTo(q.center);
+      const above = clamp((camR - q.clouds.geometry.parameters.radius)/300, 0, 1);
+      q.clouds.material.opacity = q.biome.cloudOpacity * lerp(0.13, 1, smoothstep(above));
+    }
   }
 }
 
-/* ---- next-piece preview ---- */
-function drawNextPreview(){
-  nctx.setTransform(1,0,0,1,0,0);
-  nctx.clearRect(0,0,64,64);
-  if(!nextType) return;
-  const piece = buildPiece(nextType,0);
-  nctx.save();
-  nctx.translate(32,32);
-  const sc = 0.62;
-  nctx.scale(sc,sc);
-  for(const o of piece.offsets){
-    nctx.save(); nctx.translate(o.x,o.y); drawCell(nctx, piece.color, false); nctx.restore();
+/* ==================================================================
+   HUD
+   ================================================================== */
+/* navigation markers: one label per planet so you can pick a
+   destination and see its biome + distance from anywhere */
+function initMarkers(){
+  const wrap = document.getElementById('markers');
+  for(const p of planets){
+    const el = document.createElement('div');
+    el.className = 'marker';
+    el.style.color = '#' + p.biome.atmo.toString(16).padStart(6,'0');
+    el.innerHTML = `<div class="dia">◇</div>${p.name.toUpperCase()}<br>`+
+      `${p.biomeKey} · <span class="md"></span>`;
+    el.style.display = 'none';
+    wrap.appendChild(el);
+    p.markerEl = el;
+    p.markerDist = el.querySelector('.md');
   }
-  nctx.restore();
+}
+function updateMarkers(){
+  for(const p of planets){
+    const el = p.markerEl;
+    if(!el) continue;
+    _v1.copy(p.center).sub(camera.position);
+    const dist = _v1.length();
+    // only useful while flying, and hidden once you've arrived
+    if(mode!=='STARSHIP' || dist < p.radius*3.5){ el.style.display='none'; continue; }
+    _v2.copy(FWD).applyQuaternion(camera.quaternion);
+    if(_v1.dot(_v2) < 0){ el.style.display='none'; continue; } // behind us
+    _v3.copy(p.center).project(camera);
+    el.style.display = 'block';
+    el.style.left = ((_v3.x*0.5+0.5)*innerWidth)+'px';
+    el.style.top  = ((-_v3.y*0.5+0.5)*innerHeight)+'px';
+    p.markerDist.textContent = (dist/1000).toFixed(1)+' km';
+  }
 }
 
-/* ---- HUD ---- */
-function updateHUD(){
-  el('hHeight').textContent = displayHeight.toFixed(1);
-  el('hScore').textContent = score.toLocaleString();
-  el('hMax').textContent = Math.max(maxHeight,bestHeight).toFixed(1);
+const $ = id=>document.getElementById(id);
+const hudEls = {
+  system:$('hud-system'), planet:$('hud-planet'), biome:$('hud-biome'), grav:$('hud-grav'),
+  speed:$('hud-speed'), alt:$('hud-alt'), mode:$('hud-mode'), hints:$('hud-hints'),
+  prompt:$('prompt'), reticle:$('reticle'),
+};
+const HINTS = {
+  STARSHIP:'MOUSE/ARROWS steer · W/S thrust · SPACE boost · A/D roll',
+  LANDING :'AUTOPILOT — TOUCHING DOWN',
+  FOOT    :'WASD move · SPACE jump · SHIFT sprint · V camera',
+};
+function updateHUD(near, canLand, canBoard){
+  hudEls.system.textContent = systemName.toUpperCase() + ' SYSTEM';
+  const showPlanet = near.alt < near.planet.radius*4;
+  hudEls.planet.textContent = showPlanet ? near.planet.name.toUpperCase() : '—';
+  hudEls.biome.textContent  = showPlanet ? near.planet.biomeKey : 'DEEP SPACE';
+  hudEls.grav.textContent   = showPlanet ? near.planet.gravity.toFixed(2)+'g' : '—';
+
+  const spd = mode==='FOOT' ? player.vel.length() : Math.abs(ship.speed);
+  hudEls.speed.textContent = Math.round(spd);
+  hudEls.alt.textContent   = Math.max(0,Math.round(near.alt)).toLocaleString('en-US');
+
+  hudEls.mode.textContent  = mode==='FOOT' ? 'ON FOOT' : mode==='LANDING' ? 'LANDING'
+    : 'STARSHIP · ' + ship.def.name;
+  hudEls.hints.textContent = HINTS[mode]||'';
+  hudEls.reticle.style.display = mode==='STARSHIP' ? 'block' : 'none';
+
+  if(canLand){ hudEls.prompt.textContent='[ F ]  LAND & DISEMBARK'; hudEls.prompt.style.display='block'; }
+  else if(canBoard){ hudEls.prompt.textContent='[ F ]  BOARD SHIP'; hudEls.prompt.style.display='block'; }
+  else hudEls.prompt.style.display='none';
 }
 
-/* ======================================================================
+/* ==================================================================
    MAIN LOOP
-   ====================================================================== */
-function loop(now){
-  let dt = (now-lastTime)/1000; lastTime=now;
-  if(dt>0.05) dt=0.05;            // clamp big gaps
-  bgGridOffset += dt;
-  update(dt);
-  updateParticles(dt);
-  if(shake>0) shake *= Math.pow(0.001, dt); // decay quickly
-  if(shake<0.2) shake=0;
-  render();
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
+   ================================================================== */
+function tick(){
+  requestAnimationFrame(tick);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if(paused){ composer.render(); return; }
 
-/* ======================================================================
-   INPUT
-   ====================================================================== */
-let pointerDown=false, pointerMoved=false, startX=0, startCtrlX=0, startY=0;
-const DRAG_THRESH = 6;
+  // drifting clouds on every planet
+  for(const p of planets) if(p.clouds) p.clouds.rotation.y += p.cloudSpin*dt;
 
-function screenToWorldX(clientX){
-  const offX=(viewW - W)/2;
-  return clientX/scale - offX;
-}
-
-function onDown(e){
-  if(state!=='playing') return;
-  const cx = (e.touches?e.touches[0].clientX:e.clientX);
-  const cy = (e.touches?e.touches[0].clientY:e.clientY);
-  pointerDown=true; pointerMoved=false;
-  startX=cx; startY=cy;
-  startCtrlX = controlled? controlled.x : W/2;
-}
-function onMove(e){
-  if(!pointerDown || state!=='playing' || !controlled) return;
-  const cx = (e.touches?e.touches[0].clientX:e.clientX);
-  const cy = (e.touches?e.touches[0].clientY:e.clientY);
-  if(Math.abs(cx-startX)>DRAG_THRESH || Math.abs(cy-startY)>DRAG_THRESH) pointerMoved=true;
-  if(pointerMoved){
-    const worldDx = (cx-startX)/scale;
-    controlled.x = startCtrlX + worldDx;
-    clampControlled();
+  let near, canLand=false, canBoard=false;
+  if(mode==='STARSHIP'){
+    near = updateShip(dt);
+    canLand = landingCheck(near);
+  } else if(mode==='LANDING'){
+    updateLanding(dt);
+    near = nearestPlanet(ship.pos);
+  } else {
+    updatePlayer(dt);
+    near = nearestPlanet(player.pos);
+    canBoard = player.pos.distanceTo(ship.pos) < 8;
   }
-}
-function onUp(e){
-  if(!pointerDown) return;
-  pointerDown=false;
-  if(state!=='playing') return;
-  if(!pointerMoved){
-    rotateControlled();          // tap = rotate
+
+  // move camera to its target (optionally blending across a mode switch)
+  if(camBlend.active){
+    camBlend.t += dt/camBlend.dur;
+    if(camBlend.t>=1){
+      camBlend.active=false;
+      camera.position.copy(camTargetPos);
+      camera.quaternion.copy(camTargetQuat);
+    } else {
+      const e = smoothstep(camBlend.t);
+      camera.position.lerpVectors(camBlend.fromPos, camTargetPos, e);
+      camera.quaternion.slerpQuaternions(camBlend.fromQuat, camTargetQuat, e);
+    }
+  } else if(mode==='FOOT'){
+    camera.position.copy(camTargetPos);   // 1:1 mouse-look, no smoothing
+    camera.quaternion.copy(camTargetQuat);
+  } else {
+    camera.position.lerp(camTargetPos, 1-Math.exp(-8*dt));
+    camera.quaternion.slerp(camTargetQuat, 1-Math.exp(-10*dt));
   }
+
+  updateAtmosphereFX(near);
+  updateHUD(near, canLand, canBoard);
+  updateMarkers();
+  composer.render();
 }
 
-canvas.addEventListener('mousedown', onDown);
-window.addEventListener('mousemove', onMove);
-window.addEventListener('mouseup', onUp);
-canvas.addEventListener('touchstart', e=>{ onDown(e); }, {passive:true});
-canvas.addEventListener('touchmove', e=>{ onMove(e); e.preventDefault(); }, {passive:false});
-canvas.addEventListener('touchend', onUp);
+/* ==================================================================
+   INPUT + BOOT
+   ================================================================== */
+const overlay = document.getElementById('overlay');
+// Pointer lock is preferred, but some browsers/devices deny or lack it —
+// then we run "unlocked" and read mouse deltas straight off mousemove.
+let usingFallback = false;
 
-// keyboard (desktop nicety)
-window.addEventListener('keydown', e=>{
-  if(state!=='playing'||!controlled) return;
-  if(e.key==='ArrowLeft'){ controlled.x-=CELL*0.6; clampControlled(); }
-  else if(e.key==='ArrowRight'){ controlled.x+=CELL*0.6; clampControlled(); }
-  else if(e.key==='ArrowUp'||e.key.toLowerCase()==='r'){ rotateControlled(); }
-  else if(e.key===' '||e.key==='ArrowDown'){ e.preventDefault(); dropControlled(); }
-});
-
-// buttons
-el('rotateBtn').addEventListener('click', ()=>{ Sound.resume(); rotateControlled(); });
-el('dropBtn').addEventListener('click', ()=>{ Sound.resume(); dropControlled(); });
-
-function beginPlay(){ Sound.init(); Sound.resume(); startGame(); }
-el('playBtn').addEventListener('click', beginPlay);
-el('againBtn').addEventListener('click', beginPlay);
-
-// mute toggles
-function refreshMute(){
-  const m = Sound.isMuted();
-  const icon = m?'🔇':'🔊';
-  el('muteBtnStart').textContent=icon;
-  el('muteBtnGame').textContent=icon;
-  el('muteLabel').textContent = m?'Sound off':'Sound on';
+function startGame(){
+  if(!paused) return;
+  paused = false;
+  overlay.style.display = 'none';
+  document.getElementById('hud').style.display = 'block';
+  for(const k in keys) keys[k]=false;
+  mouseDX = mouseDY = 0;
+  clock.getDelta(); // swallow the paused time so dt doesn't spike
 }
-function toggleMute(){ Sound.init(); Sound.setMuted(!Sound.isMuted()); refreshMute(); }
-el('muteBtnStart').addEventListener('click', toggleMute);
-el('muteBtnGame').addEventListener('click', toggleMute);
+function pauseGame(){
+  if(paused) return;
+  paused = true;
+  document.body.classList.remove('nocursor');
+  overlay.style.display = 'flex';
+  document.getElementById('go-label').textContent = 'CLICK TO RESUME';
+  for(const k in keys) keys[k]=false;
+  mouseDX = mouseDY = 0;
+}
 
-// init start screen
-el('startBest').textContent = bestHeight.toFixed(1);
-refreshMute();
+/* Some keyboards report vertical arrows differently: numpad arrows give
+   e.code "Numpad8"/"Numpad2" (with a proper e.key), and Fn-layer arrows on
+   compact layouts emit PageUp/PageDown. Register every alias so steering
+   works regardless of the physical keyboard. */
+function keyAliases(e){
+  const out = [e.code];
+  if(e.key && e.key.startsWith('Arrow') && e.key!==e.code) out.push(e.key);
+  if(e.code==='PageUp'   || e.key==='PageUp')   out.push('ArrowUp');
+  if(e.code==='PageDown' || e.key==='PageDown') out.push('ArrowDown');
+  return out;
+}
 
-})();
+function initInput(){
+  addEventListener('keydown', e=>{
+    if(e.code==='Space' || e.code.startsWith('Arrow') ||
+       e.code==='PageUp' || e.code==='PageDown' ||
+       (e.key && e.key.startsWith('Arrow'))) e.preventDefault();
+    if(e.code==='Escape' && usingFallback) pauseGame(); // no lock = no browser Esc handling
+    if(keys[e.code]) return;
+    for(const k of keyAliases(e)) keys[k]=true;
+    if(paused) return;
+    if(e.code==='KeyF') tryInteract();
+    if(e.code==='KeyV' && mode==='FOOT'){ player.thirdPerson=!player.thirdPerson; startCameraBlend(0.35); }
+  });
+  addEventListener('keyup', e=>{ for(const k of keyAliases(e)) keys[k]=false; });
+
+  addEventListener('mousemove', e=>{
+    const locked = document.pointerLockElement===renderer.domElement;
+    if(paused || (!locked && !usingFallback)) return;
+    mouseDX += e.movementX||0; mouseDY += e.movementY||0;
+  });
+
+  overlay.addEventListener('click', ()=>{
+    if(!window.STARFALL) return; // not booted yet
+    let req = null;
+    try{ req = renderer.domElement.requestPointerLock(); }catch(err){ /* fall back below */ }
+    if(req && typeof req.catch==='function') req.catch(()=>{});
+    // if the lock didn't engage (denied / unsupported), start without it
+    setTimeout(()=>{
+      if(paused && document.pointerLockElement!==renderer.domElement){
+        usingFallback = true;
+        document.body.classList.add('nocursor');
+        startGame();
+      }
+    }, 350);
+  });
+
+  document.addEventListener('pointerlockchange', ()=>{
+    if(document.pointerLockElement===renderer.domElement){
+      usingFallback = false;
+      startGame();
+    } else if(!usingFallback){
+      pauseGame(); // user pressed Esc while locked
+    }
+  });
+}
+
+/* build the clickable ship cards on the overlay */
+function initShipCards(){
+  const maxSpd = Math.max(...SHIPS.map(s=>s.stats.MAX_SPEED*s.stats.BOOST_MULT));
+  const maxAgi = Math.max(...SHIPS.map(s=>s.stats.TURN_SENS));
+  const row = document.getElementById('ship-row');
+  const barRow = (label, frac)=>
+    `<div class="srow"><span>${label}</span><div class="bar"><i style="width:${Math.round(frac*100)}%"></i></div></div>`;
+  SHIPS.forEach((s,i)=>{
+    const card = document.createElement('div');
+    card.className = 'ship-card';
+    card.innerHTML =
+      `<div class="sname">${s.name}</div>`+
+      `<div class="sclass">${s.cls} — ${s.desc}</div>`+
+      barRow('SPD', (s.stats.MAX_SPEED*s.stats.BOOST_MULT)/maxSpd)+
+      barRow('AGI', s.stats.TURN_SENS/maxAgi);
+    // stopPropagation so picking a ship doesn't also trigger click-to-begin
+    card.addEventListener('click', e=>{ e.stopPropagation(); selectShip(i); });
+    row.appendChild(card);
+  });
+}
+
+function boot(){
+  initRenderer();
+  initSky();
+  initUniverse();
+  initShipCards();
+  initMarkers();
+  initShip();
+  initPlayer();
+  initInput();
+  document.getElementById('go-label').textContent = 'CLICK TO BEGIN';
+  if(matchMedia('(pointer:coarse)').matches && !matchMedia('(pointer:fine)').matches)
+    document.getElementById('touch-note').style.display = 'block';
+  document.getElementById('seed-label').textContent =
+    'SEED '+SEED+' — append ?seed='+SEED+' to the URL to revisit this universe';
+  // pre-position the camera behind the ship for the title backdrop
+  _v3.fromArray(ship.def.camOffset).applyQuaternion(ship.quat);
+  camera.position.copy(ship.pos).add(_v3);
+  camera.lookAt(planets[0].center);
+  tick();
+}
+
+// tiny delay so "GENERATING UNIVERSE…" paints before the synchronous
+// terrain build briefly blocks the main thread
+setTimeout(()=>{
+  boot();
+  // console handle for live tweaking: STARFALL.planets, STARFALL.ship, …
+  window.STARFALL = { CONFIG, BIOMES, SHIPS, planets, ship, player, camera, seed:SEED,
+    terrainRadius, selectShip, get mode(){ return mode; } };
+}, 60);
 </script>
 </body>
 </html>
