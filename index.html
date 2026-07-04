@@ -1549,17 +1549,31 @@ function pauseGame(){
   mouseDX = mouseDY = 0;
 }
 
+/* Some keyboards report vertical arrows differently: numpad arrows give
+   e.code "Numpad8"/"Numpad2" (with a proper e.key), and Fn-layer arrows on
+   compact layouts emit PageUp/PageDown. Register every alias so steering
+   works regardless of the physical keyboard. */
+function keyAliases(e){
+  const out = [e.code];
+  if(e.key && e.key.startsWith('Arrow') && e.key!==e.code) out.push(e.key);
+  if(e.code==='PageUp'   || e.key==='PageUp')   out.push('ArrowUp');
+  if(e.code==='PageDown' || e.key==='PageDown') out.push('ArrowDown');
+  return out;
+}
+
 function initInput(){
   addEventListener('keydown', e=>{
-    if(e.code==='Space' || e.code.startsWith('Arrow')) e.preventDefault();
+    if(e.code==='Space' || e.code.startsWith('Arrow') ||
+       e.code==='PageUp' || e.code==='PageDown' ||
+       (e.key && e.key.startsWith('Arrow'))) e.preventDefault();
     if(e.code==='Escape' && usingFallback) pauseGame(); // no lock = no browser Esc handling
     if(keys[e.code]) return;
-    keys[e.code]=true;
+    for(const k of keyAliases(e)) keys[k]=true;
     if(paused) return;
     if(e.code==='KeyF') tryInteract();
     if(e.code==='KeyV' && mode==='FOOT'){ player.thirdPerson=!player.thirdPerson; startCameraBlend(0.35); }
   });
-  addEventListener('keyup', e=>{ keys[e.code]=false; });
+  addEventListener('keyup', e=>{ for(const k of keyAliases(e)) keys[k]=false; });
 
   addEventListener('mousemove', e=>{
     const locked = document.pointerLockElement===renderer.domElement;
